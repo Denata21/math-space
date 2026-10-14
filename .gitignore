@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Supabase (kalau mau rahasia — tapi anon key aman dipublish)
+# js/supabase-client.js
+
+# System
+.DS_Store
+Thumbs.db
+*.log
+
+# Vercel
+.vercel
+
+# Editor
+.vscode/
+.idea/
+*.swp
