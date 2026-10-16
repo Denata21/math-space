@@ -55,96 +55,39 @@ function extractVars(expr, allVars) {
   return found;
 }
 
-function solveFormulas(tabKey, inputValues) {
-  const tab = FORMULAS[tabKey];
-  if (!tab) throw new Error('Tab tidak ditemukan: ' + tabKey);
+for (const v of allVarCodes) {
+  const val = normalized[v];
 
-  // Custom calculator (statistika, pencacahan)
-  if (tab.custom) {
-    return solveCustom(tabKey, inputValues, tab);
+  // Skip kalau kosong
+  if (val === '' || val === null || val === undefined) {
+    targets.push(v);
+    continue;
   }
 
-  // ===== BARU: Validasi konsistensi input =====
-  if (typeof tab.validasi === 'function') {
-    const errorValidasi = tab.validasi(inputValues);
-    if (errorValidasi && errorValidasi.length > 0) {
-      const err = new Error('INPUT_TIDAK_KONSISTEN');
-      err.detail = errorValidasi;
-      throw err;
+  // Bersihkan string: hapus titik ribuan
+  // Tapi hati-hati: kalau titiknya desimal (mis. "0.05"), jangan dihapus
+  let cleaned = String(val).trim();
+
+  if (cleaned.includes(',')) {
+    // Format Indonesia: 1.000,5 → hapus titik, ganti koma jadi titik
+    cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+  } else if (cleaned.includes('.')) {
+    // Kalau ada titik, cek: apakah desimal atau ribuan?
+    const parts = cleaned.split('.');
+    if (parts[1] && parts[1].length >= 3) {
+      // Contoh: "100.000" → titik + 3 digit → ini ribuan
+      cleaned = cleaned.replace(/\./g, '');
     }
+    // Kalau parts[1].length < 3 (mis. "0.5"), biarkan (desimal)
   }
 
-  const values = {};
-  const targets = [];
-  // ... (sisanya sama seperti sebelumnya)
-  const allVarCodes = tab.variabel.filter(v => !v.readonly).map(v => v.kode);
+  const num = parseFloat(cleaned);
 
-  const normalized = { ...inputValues };
-  if (normalized.i !== undefined && normalized.i !== '' && normalized.i !== null) {
-    normalized.i = parseFloat(normalized.i) / 100;
+  if (isNaN(num)) {
+    targets.push(v);
+  } else {
+    values[v] = num;
   }
-
-  for (const v of allVarCodes) {
-    const val = normalized[v];
-    if (val === '' || val === null || val === undefined || isNaN(parseFloat(val))) {
-      targets.push(v);
-    } else {
-      values[v] = parseFloat(val);
-    }
-  }
-
-  if (targets.length === 0) {
-    throw new Error('Semua variabel sudah terisi. Kosongkan minimal satu untuk ditanya.');
-  }
-  if (Object.keys(values).length === 0) {
-    throw new Error('Isi minimal satu variabel yang diketahui.');
-  }
-
-  const steps = [];
-  let remaining = [...targets];
-  let maxIter = 30;
-
-  while (remaining.length > 0 && maxIter-- > 0) {
-    let progress = false;
-
-    for (const rule of tab.rumus) {
-      if (!remaining.includes(rule.target)) continue;
-
-      const needed = extractVars(rule.ekspresi, allVarCodes);
-      const canCompute = needed.every(v => values[v] !== undefined);
-      if (!canCompute) continue;
-
-      let result;
-      try {
-        result = evalFormula(rule.ekspresi, values);
-      } catch (e) {
-        continue;
-      }
-      if (!isFinite(result)) continue;
-
-      values[rule.target] = result;
-      remaining = remaining.filter(t => t !== rule.target);
-      progress = true;
-
-      steps.push({
-        target: rule.target,
-        ekspresi: rule.ekspresi,
-        needed: needed.slice(),
-        values: { ...values },
-        result: result
-      });
-    }
-
-    if (!progress) break;
-  }
-
-  return {
-    values,
-    steps,
-    targets,
-    unresolved: remaining,
-    tab
-  };
 }
 
 /* ----- Custom solver untuk statistika & pencacahan ----- */
@@ -323,14 +266,11 @@ function formatAngkaEngine(angka) {
 
 /* ===== BARU: Format ribuan untuk input ===== */
 function formatRibuanInput(str) {
-  // Hapus semua non-digit
   let num = String(str).replace(/[^\d]/g, '');
   if (!num) return '';
-  // Format dengan titik setiap 3 digit
   return parseInt(num, 10).toLocaleString('id-ID');
 }
 
 function parseRibuanInput(str) {
-  // Ubah "1.000.000" → 1000000
   return String(str).replace(/\./g, '').replace(/,/g, '');
 }

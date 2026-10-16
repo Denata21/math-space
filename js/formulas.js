@@ -27,11 +27,11 @@ Konsep kunci:
       { kode: "n",  label: "Lama Periode", satuan: "periode" },
       { kode: "b",  label: "Bunga",        satuan: "Rp" }
     ],
-    rumus: [
+      rumus: [
       { target: "b",  ekspresi: "M0 * i * n" },
       { target: "Mn", ekspresi: "M0 + b" },
-      { target: "i",  ekspresi: "b / (M0 * n)" },
-      { target: "n",  ekspresi: "b / (M0 * i)" },
+      { target: "i",  ekspresi: "b / (M0 * n)" },     // ← i dari b
+      { target: "n",  ekspresi: "b / (M0 * i)" },     // ← n dari b
       { target: "b",  ekspresi: "Mn - M0" },
       { target: "M0", ekspresi: "Mn - b" },
       { target: "i",  ekspresi: "(Mn - M0) / (M0 * n)" },

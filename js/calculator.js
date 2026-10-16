@@ -115,20 +115,19 @@ function renderFormulaCalculator(area, key) {
       return;
     }
 
-    // Input Rp dengan format ribuan
-    if (isRupiah) {
-      html += `
-        <div class="form-group">
-          <label>
-            ${v.label} <code>${v.kode}</code>
-            <span style="color:var(--gray-text);font-weight:400;">(${v.satuan})</span>
-          </label>
-          <input type="text" inputmode="numeric" class="form-control input-rupiah"
-            id="fv_${v.kode}" placeholder="kosongkan jika ditanya"
-            data-kode="${v.kode}"
-            oninput="handleRupiahInput(this)">
-        </div>
-      `;
+        // Input Rp dengan format ribuan
+        if (isRupiah) {
+        html += `
+          <div class="form-group">
+            <label>
+              ${v.label} <code>${v.kode}</code>
+              <span style="color:var(--gray-text);font-weight:400;">(${v.satuan})</span>
+            </label>
+            <input type="text" inputmode="numeric" class="form-control input-rupiah"
+                  id="fv_${v.kode}" placeholder="kosongkan jika ditanya"
+                  oninput="handleRupiahInput(this)">
+          </div>
+        `;
       return;
     }
 
