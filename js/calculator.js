@@ -1,4 +1,7 @@
-/* CALCULATOR */
+/* ============================================================
+   HALAMAN KALKULATOR — Router dengan Dropdown Materi
+   ============================================================ */
+
 let activeCalculator = 'bunga-tunggal';
 
 function renderCalculatorPage() {
@@ -16,36 +19,49 @@ function renderCalculatorPage() {
 
   let optionsHtml = '';
   daftar.forEach(function(c) {
-    optionsHtml += '<option value="' + c.key + '">' + c.icon + ' - ' + c.label + '</option>';
+    optionsHtml += `<option value="${c.key}">${c.icon} - ${c.label}</option>`;
   });
 
-  app.innerHTML = '<div class="hero" style="padding:32px 28px;">' +
-    '<h2>Kalkulator Matematika</h2>' +
-    '<p>Pilih materi, masukkan nilai yang diketahui, dan kosongkan variabel yang ingin ditanyakan.</p>' +
-    '</div>' +
-    '<div class="calc-panel" style="padding:20px 24px;">' +
-    '<div class="form-group" style="margin-bottom:0;">' +
-    '<label style="font-size:14px;font-weight:600;">Pilih Materi</label>' +
-    '<select class="form-control" id="calcMateri" style="font-size:15px;padding:12px;margin-top:6px;">' +
-    optionsHtml +
-    '</select>' +
-    '</div>' +
-    '</div>' +
-    '<div id="calcArea"></div>' +
-    '<div id="calcHistoryArea"></div>';
+  app.innerHTML = `
+    <div class="hero" style="padding:32px 28px;">
+      <h2>Kalkulator Matematika</h2>
+      <p>Pilih materi, masukkan nilai yang diketahui, dan kosongkan variabel yang ingin ditanyakan.</p>
+    </div>
+
+    <div class="calc-panel" style="padding:20px 24px;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label style="font-size:14px;font-weight:600;">Pilih Materi</label>
+        <select class="form-control" id="calcMateri" style="font-size:15px;padding:12px;margin-top:6px;">
+          ${optionsHtml}
+        </select>
+      </div>
+    </div>
+
+    <div id="calcArea"></div>
+    <div id="calcHistoryArea"></div>
+  `;
 
   const select = document.getElementById('calcMateri');
   if (select) {
     select.value = activeCalculator;
-    select.onchange = function() { switchCalculator(this.value); };
+    select.onchange = function() { 
+      switchCalculator(this.value); 
+    };
   }
 
   renderCalculatorContent(activeCalculator);
 }
 
 function switchCalculator(key) {
+  // 1. Update variabel global
   activeCalculator = key;
+  
+  // 2. Render ulang form sesuai key
   renderCalculatorContent(key);
+  
+  // 3. Pastikan dropdown value sinkron (jaga-jaga)
+  const select = document.getElementById('calcMateri');
+  if (select) select.value = key;
 }
 
 function renderCalculatorContent(key) {
@@ -53,9 +69,11 @@ function renderCalculatorContent(key) {
   if (!area) return;
   area.innerHTML = '';
 
+  // Pastikan dropdown sinkron
   const select = document.getElementById('calcMateri');
   if (select && select.value !== key) select.value = key;
 
+  // Custom calculators
   if (key === 'statistika' && typeof renderCalcStatistika === 'function') {
     renderCalcStatistika(area);
     renderCalcHistory('statistika');
@@ -73,9 +91,10 @@ function renderCalculatorContent(key) {
     return;
   }
 
+  // Formula Engine (Bunga Tunggal, Majemuk, Anuitas)
   const tab = FORMULAS[key];
   if (!tab) {
-    area.innerHTML = '<div class="calc-panel"><p style="color:red;">Materi tidak ditemukan: ' + key + '</p></div>';
+    area.innerHTML = `<div class="calc-panel"><p style="color:red;">Materi tidak ditemukan: ${key}</p></div>`;
     return;
   }
 
@@ -97,10 +116,8 @@ function renderFormulaCalculator(area, key) {
   tab.variabel.forEach(v => {
     if (v.readonly) return;
 
-    // Format ribuan untuk Rp
     const isRupiah = (v.satuan === 'Rp');
 
-    // Pilihan untuk select (mis. pencacahan)
     if (v.tipe === 'select' && v.opsi) {
       let optionsHtml = '';
       v.opsi.forEach(o => {
@@ -115,23 +132,21 @@ function renderFormulaCalculator(area, key) {
       return;
     }
 
-        // Input Rp dengan format ribuan
-        if (isRupiah) {
-        html += `
-          <div class="form-group">
-            <label>
-              ${v.label} <code>${v.kode}</code>
-              <span style="color:var(--gray-text);font-weight:400;">(${v.satuan})</span>
-            </label>
-            <input type="text" inputmode="numeric" class="form-control input-rupiah"
-                  id="fv_${v.kode}" placeholder="kosongkan jika ditanya"
-                  oninput="handleRupiahInput(this)">
-          </div>
-        `;
+    if (isRupiah) {
+      html += `
+        <div class="form-group">
+          <label>
+            ${v.label} <code>${v.kode}</code>
+            <span style="color:var(--gray-text);font-weight:400;">(${v.satuan})</span>
+          </label>
+          <input type="text" inputmode="numeric" class="form-control input-rupiah"
+                 id="fv_${v.kode}" placeholder="kosongkan jika ditanya"
+                 oninput="handleRupiahInput(this)">
+        </div>
+      `;
       return;
     }
 
-    // Input number biasa
     html += `
       <div class="form-group">
         <label>
@@ -139,7 +154,7 @@ function renderFormulaCalculator(area, key) {
           <span style="color:var(--gray-text);font-weight:400;">(${v.satuan})</span>
         </label>
         <input type="number" step="any" class="form-control"
-          id="fv_${v.kode}" placeholder="kosongkan jika ditanya">
+               id="fv_${v.kode}" placeholder="kosongkan jika ditanya">
       </div>
     `;
   });
@@ -161,36 +176,19 @@ function renderFormulaCalculator(area, key) {
   area.innerHTML = html;
 }
 
-/* ===== BARU: Handler input Rupiah dengan format ribuan ===== */
 function handleRupiahInput(el) {
   const raw = el.value;
-  // Kalau kosong, biarkan
   if (!raw || raw.trim() === '') {
     el.value = '';
     return;
   }
-
-  // Simpan posisi kursor
   const cursorPos = el.selectionStart;
   const lengthBefore = raw.length;
-
-  // Format
   const formatted = formatRibuanInput(raw);
   el.value = formatted;
-
-  // Sesuaikan posisi kursor
   const lengthAfter = formatted.length;
   const diff = lengthAfter - lengthBefore;
   el.setSelectionRange(cursorPos + diff, cursorPos + diff);
-}
-
-/* ===== BARU: Ambil nilai input (bersih dari titik) ===== */
-function getInputValue(kode) {
-  const el = document.getElementById('fv_' + kode);
-  if (!el) return '';
-  const raw = el.value.trim();
-  if (raw === '') return '';
-  return parseRibuanInput(raw);
 }
 
 function showFormulaTheory(key) {
@@ -200,10 +198,12 @@ function showFormulaTheory(key) {
 
   if (el.style.display === 'none') {
     el.style.display = 'block';
-    el.innerHTML = '<div class="calc-panel" style="background:#f0f7ff;border-color:var(--blue);">' +
-      '<h3 style="font-size:15px;margin-bottom:10px;color:var(--blue-dark);">Teori: ' + tab.judul + '</h3>' +
-      '<p style="font-size:14px;white-space:pre-line;line-height:1.8;">' + (tab.teori || tab.deskripsi) + '</p>' +
-      '</div>';
+    el.innerHTML = `
+      <div class="calc-panel" style="background:#f0f7ff;border-color:var(--blue);">
+        <h3 style="font-size:15px;margin-bottom:10px;color:var(--blue-dark);">Teori: ${tab.judul}</h3>
+        <p style="font-size:14px;white-space:pre-line;line-height:1.8;">${tab.teori || tab.deskripsi}</p>
+      </div>
+    `;
   } else {
     el.style.display = 'none';
     el.innerHTML = '';
@@ -211,20 +211,24 @@ function showFormulaTheory(key) {
 }
 
 function resetFormulaForm() {
-  const tab = FORMULAS[activeCalculator];
+  const key = document.getElementById('calcMateri').value;
+  const tab = FORMULAS[key];
   if (!tab) return;
+  
   tab.variabel.forEach(function(v) {
     const el = document.getElementById('fv_' + v.kode);
     if (el) el.value = '';
   });
   const errEl = document.getElementById('formulaError');
-  if (errEl) errEl.textContent = '';
+  if (errEl) errEl.innerHTML = '';
   const resEl = document.getElementById('formulaResult');
   if (resEl) resEl.innerHTML = '';
 }
 
 function runFormula() {
-  const tab = FORMULAS[activeCalculator];
+  // 👇 BACA LANGSUNG DARI DROPDOWN (Mencegah bug logika nyasar)
+  const key = document.getElementById('calcMateri').value;
+  const tab = FORMULAS[key];
   if (!tab) return;
 
   const errEl = document.getElementById('formulaError');
@@ -238,7 +242,6 @@ function runFormula() {
     if (!el) return;
     const val = el.value.trim();
     if (val !== '') {
-      // Rp: parse dari format ribuan
       if (v.satuan === 'Rp') {
         input[v.kode] = parseRibuanInput(val);
       } else {
@@ -249,9 +252,9 @@ function runFormula() {
 
   let result;
   try {
-    result = solveFormulas(activeCalculator, input);
+    // 👇 GUNAKAN 'key' DARI DROPDOWN, BUKAN 'activeCalculator'
+    result = solveFormulas(key, input);
   } catch (e) {
-    // Warning konsistensi
     if (e.message === 'INPUT_TIDAK_KONSISTEN' && e.detail) {
       let html = `<div class="warning-box" style="margin-top:12px;">`;
       html += `<div class="warning-title">⚠️ Nilai tidak konsisten</div>`;
@@ -281,7 +284,7 @@ function runFormula() {
   }
 
   renderFormulaResult(result);
-  simpanRiwayat(activeCalculator, input, result);
+  simpanRiwayat(key, input, result);
 }
 
 function renderFormulaResult(result) {
@@ -289,27 +292,27 @@ function renderFormulaResult(result) {
   const area = document.getElementById('formulaResult');
   if (!area) return;
 
-  let html = '<div class="calc-panel" style="margin-top:16px;">';
-  html += '<h3 style="font-size:15px;margin-bottom:12px;color:var(--blue-dark);">Hasil dan Langkah Penyelesaian</h3>';
+  let html = `<div class="calc-panel" style="margin-top:16px;">`;
+  html += `<h3 style="font-size:15px;margin-bottom:12px;color:var(--blue-dark);">Hasil dan Langkah Penyelesaian</h3>`;
 
   const known = tab.variabel.filter(function(v) {
     return result.values[v.kode] !== undefined && result.targets.indexOf(v.kode) === -1;
   });
   if (known.length > 0) {
-    html += '<div style="margin-bottom:12px;"><strong>Diketahui:</strong><ul style="margin:6px 0 0 20px;">';
+    html += `<div style="margin-bottom:12px;"><strong>Diketahui:</strong><ul style="margin:6px 0 0 20px;">`;
     known.forEach(function(v) {
       let val = result.values[v.kode];
       if (v.kode === 'i') val = formatAngkaEngine(val * 100) + '%';
       else if (v.satuan === 'Rp') val = formatRupiahEngine(val);
       else val = formatAngkaEngine(val);
-      html += '<li>' + v.kode + ' = ' + val + '</li>';
+      html += `<li>${v.kode} = ${val}</li>`;
     });
-    html += '</ul></div>';
+    html += `</ul></div>`;
   }
 
-  html += '<div style="margin-bottom:16px;"><strong>Ditanya:</strong> ' + result.targets.join(', ') + '</div>';
-  html += '<h4 style="font-size:14px;margin-bottom:8px;">Langkah Penyelesaian</h4>';
-  html += '<ol style="margin-left:20px;font-size:14px;line-height:1.9;">';
+  html += `<div style="margin-bottom:16px;"><strong>Ditanya:</strong> ${result.targets.join(', ')}</div>`;
+  html += `<h4 style="font-size:14px;margin-bottom:8px;">Langkah Penyelesaian</h4>`;
+  html += `<ol style="margin-left:20px;font-size:14px;line-height:1.9;">`;
 
   result.steps.forEach(function(s) {
     const varInfo = tab.variabel.find(function(v) { return v.kode === s.target; }) || {};
@@ -319,16 +322,16 @@ function renderFormulaResult(result) {
     else if (typeof s.result === 'string') hasilFmt = s.result;
     else hasilFmt = formatAngkaEngine(s.result);
 
-    html += '<li>';
-    html += '<div><strong>' + s.target + '</strong> = <code>' + s.ekspresi + '</code></div>';
-    html += '<div>= <strong>' + hasilFmt + '</strong></div>';
-    html += '</li>';
+    html += `<li>`;
+    html += `<div><strong>${s.target}</strong> = <code>${s.ekspresi}</code></div>`;
+    html += `<div>= <strong>${hasilFmt}</strong></div>`;
+    html += `</li>`;
   });
 
-  html += '</ol>';
+  html += `</ol>`;
 
-  html += '<div class="example-box" style="margin-top:14px;">';
-  html += '<strong>Jawaban Akhir:</strong><ul style="margin:6px 0 0 20px;">';
+  html += `<div class="example-box" style="margin-top:14px;">`;
+  html += `<strong>Jawaban Akhir:</strong><ul style="margin:6px 0 0 20px;">`;
   result.targets.forEach(function(t) {
     const info = tab.variabel.find(function(v) { return v.kode === t; }) || {};
     const val = result.values[t];
@@ -337,27 +340,27 @@ function renderFormulaResult(result) {
     else if (info.satuan === 'Rp') valFmt = formatRupiahEngine(val);
     else if (typeof val === 'string') valFmt = val;
     else valFmt = formatAngkaEngine(val);
-    html += '<li>' + (info.label || t) + ' (' + t + ') = <strong>' + valFmt + '</strong></li>';
+    html += `<li>${info.label || t} (${t}) = <strong>${valFmt}</strong></li>`;
   });
-  html += '</ul></div></div>';
+  html += `</ul></div></div>`;
 
   if (tab.butuhTabel && result.values.M0 !== undefined && result.values.A !== undefined
       && result.values.i !== undefined && result.values.n !== undefined) {
     const rows = generateAnuitasTable(result.values.M0, result.values.A, result.values.i, result.values.n);
-    html += '<div class="calc-panel" style="margin-top:16px;">';
-    html += '<h3 style="font-size:15px;margin-bottom:12px;color:var(--blue-dark);">Tabel Pelunasan</h3>';
-    html += '<div class="table-wrap"><table><thead><tr>';
-    html += '<th>Periode</th><th>Sisa Awal</th><th>Anuitas</th><th>Bunga</th><th>Angsuran Pokok</th><th>Sisa Akhir</th>';
-    html += '</tr></thead><tbody>';
+    html += `<div class="calc-panel" style="margin-top:16px;">`;
+    html += `<h3 style="font-size:15px;margin-bottom:12px;color:var(--blue-dark);">Tabel Pelunasan</h3>`;
+    html += `<div class="table-wrap"><table><thead><tr>`;
+    html += `<th>Periode</th><th>Sisa Awal</th><th>Anuitas</th><th>Bunga</th><th>Angsuran Pokok</th><th>Sisa Akhir</th>`;
+    html += `</tr></thead><tbody>`;
     rows.forEach(function(r) {
-      html += '<tr><td>' + r.periode + '</td>';
-      html += '<td>' + formatRupiahEngine(r.sisaAwal) + '</td>';
-      html += '<td>' + formatRupiahEngine(r.anuitas) + '</td>';
-      html += '<td>' + formatRupiahEngine(r.bunga) + '</td>';
-      html += '<td>' + formatRupiahEngine(r.pokok) + '</td>';
-      html += '<td>' + formatRupiahEngine(r.sisaAkhir) + '</td></tr>';
+      html += `<tr><td>${r.periode}</td>`;
+      html += `<td>${formatRupiahEngine(r.sisaAwal)}</td>`;
+      html += `<td>${formatRupiahEngine(r.anuitas)}</td>`;
+      html += `<td>${formatRupiahEngine(r.bunga)}</td>`;
+      html += `<td>${formatRupiahEngine(r.pokok)}</td>`;
+      html += `<td>${formatRupiahEngine(r.sisaAkhir)}</td></tr>`;
     });
-    html += '</tbody></table></div></div>';
+    html += `</tbody></table></div></div>`;
   }
 
   area.innerHTML = html;
@@ -413,7 +416,8 @@ function renderCalcHistory(materi) {
 function hapusRiwayat() {
   if (!confirm('Hapus semua riwayat perhitungan?')) return;
   localStorage.removeItem(RIWAYAT_KEY);
-  renderCalcHistory(activeCalculator);
+  const key = document.getElementById('calcMateri') ? document.getElementById('calcMateri').value : 'bunga-tunggal';
+  renderCalcHistory(key);
 }
 
 function formatRupiah(angka) {
