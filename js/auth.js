@@ -1,5 +1,5 @@
 /* ============================================================
-   AUTENTIKASI — Berbasis supabaseClient Auth
+   AUTENTIKASI — Berbasis Supabase Auth
    Password TIDAK LAGI disimpan di frontend!
    ============================================================ */
 
@@ -67,18 +67,14 @@ function getKelasSiswa() {
 
 /* ============================================================
    CEK SESSION SAAT PAGE LOAD
-   supabaseClient menyimpan session di localStorage-nya sendiri
    ============================================================ */
-
-async function cekSessionsupabaseClient() {
+async function cekSessionSupabase() {
   try {
-    const { data: { session }, error } = await supabaseClientClient.auth.getSession();
+    const { data: { session }, error } = await supabaseClient.auth.getSession();
     if (error || !session) {
-      // Belum login
       return null;
     }
 
-    // Ada session → ambil profile dari tabel profiles
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
       .select('username, nama_lengkap, role, kelas')
@@ -89,7 +85,6 @@ async function cekSessionsupabaseClient() {
       return null;
     }
 
-    // Sync ke state lokal
     const d = getAuthData();
     d.username = profile.username;
     d.nama = profile.nama_lengkap || profile.username;
@@ -109,9 +104,7 @@ async function cekSessionsupabaseClient() {
 /* ============================================================
    LOGIN
    ============================================================ */
-
 async function submitLogin(username, password) {
-  // Cari user by username dulu (untuk dapat email)
   const { data: profile, error: profileError } = await supabaseClient
     .from('profiles')
     .select('id, username, role, nama_lengkap, kelas')
@@ -122,11 +115,8 @@ async function submitLogin(username, password) {
     return { ok: false, error: 'Username tidak terdaftar.' };
   }
 
-  // Dapatkan email dari auth.users
-  // Kita asumsikan format: username@mathspace.id
   const email = username.toLowerCase() + '@mathspace.id';
 
-  // Sign in ke supabaseClient Auth
   const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
     email: email,
     password: password
@@ -137,12 +127,11 @@ async function submitLogin(username, password) {
       return { ok: false, error: 'Username atau password salah.' };
     }
     if (authError.message.includes('Email not confirmed')) {
-      return { ok: false, error: 'Email belum diverifikasi. Cek inbox email kamu.' };
+      return { ok: false, error: 'Email belum diverifikasi.' };
     }
     return { ok: false, error: authError.message };
   }
 
-  // Simpan state lokal
   const d = getAuthData();
   d.username = profile.username;
   d.nama = profile.nama_lengkap || profile.username;
@@ -157,29 +146,32 @@ async function submitLogin(username, password) {
 }
 
 /* ============================================================
-   LOGOUT
+   LOGOUT (FIX ERROR)
    ============================================================ */
-
 async function logoutUser() {
   if (!confirm('Logout dari akun ini?')) return;
 
-  // Logout dari supabaseClient (hapus session)
-  await supabaseClientClient.auth.signOut();
-
-  // Hapus state lokal
-  localStorage.removeItem(AUTH_KEY);
-
-  if (typeof renderUserArea === 'function') renderUserArea();
-  if (typeof updateHeaderVisibility === 'function') updateHeaderVisibility();
-  if (typeof renderLandingPage === 'function') renderLandingPage();
+  try {
+    if (typeof supabaseClient !== 'undefined') {
+      await supabaseClient.auth.signOut();
+    }
+  } catch (e) {
+    console.warn('[Auth] Gagal signOut Supabase:', e);
+  } finally {
+    localStorage.removeItem(AUTH_KEY);
+    if (typeof renderUserArea === 'function') renderUserArea();
+    if (typeof updateHeaderVisibility === 'function') updateHeaderVisibility();
+    if (typeof renderLandingPage === 'function') renderLandingPage();
+  }
 }
 
 function logoutGuru() { logoutUser(); }
+function loginGuru() { loginUser(); }
+function loginUser() { if (typeof loginGuru === 'function') loginGuru(); }
 
 /* ============================================================
    ROUTING SETELAH LOGIN
    ============================================================ */
-
 function routeAfterLogin() {
   const u = getCurrentUser();
   if (!u) {
@@ -197,12 +189,10 @@ function routeAfterLogin() {
 }
 
 /* ============================================================
-   DATA SISWA YANG DIPANTAU GURU (dari supabaseClient)
+   DATA SISWA (Untuk Panel Guru)
    ============================================================ */
-
-async function getSiswaDataFromsupabaseClient() {
+async function getSiswaDataFromSupabase() {
   try {
-    // Ambil semua siswa + progress + latihan
     const { data: siswaList, error: err1 } = await supabaseClient
       .from('profiles')
       .select('id, username, nama_lengkap, kelas')
@@ -224,7 +214,6 @@ async function getSiswaDataFromsupabaseClient() {
 
     if (err3) throw err3;
 
-    // Gabungkan
     const result = {};
     siswaList.forEach(s => {
       const progressSiswa = progressList.filter(p => p.user_id === s.id);
@@ -234,28 +223,18 @@ async function getSiswaDataFromsupabaseClient() {
         username: s.username,
         nama: s.nama_lengkap,
         kelas: s.kelas,
-        progress: {
-          materi: {},
-          latihan: {}
-        }
+        progress: { materi: {}, latihan: {} }
       };
 
       progressSiswa.forEach(p => {
-        if (p.selesai) {
-          result[s.username].progress.materi[p.materi_id] = { selesai: true };
-        }
+        if (p.selesai) result[s.username].progress.materi[p.materi_id] = { selesai: true };
       });
 
-      // Ambil latihan terbaik per materi
       const latihanByMateri = {};
       latihanSiswa.forEach(l => {
         if (!latihanByMateri[l.materi_id] || l.skor > latihanByMateri[l.materi_id].skor) {
           latihanByMateri[l.materi_id] = {
-            skor: l.skor,
-            benar: l.benar,
-            total: l.total,
-            terbaik: l.skor,
-            waktu: l.waktu
+            skor: l.skor, benar: l.benar, total: l.total, terbaik: l.skor, waktu: l.waktu
           };
         }
       });
@@ -264,36 +243,23 @@ async function getSiswaDataFromsupabaseClient() {
 
     return result;
   } catch (e) {
-    console.error('[supabaseClient] Error ambil data siswa:', e);
+    console.error('[Supabase] Error ambil data siswa:', e);
     return {};
   }
 }
 
-/* ============================================================
-   FUNGSI DATA SISWA (untuk kompatibilitas)
-   ============================================================ */
-
-function getSiswaData() {
-  // Sinkron: return cache kosong (biar tidak crash)
-  // Async: pakai getSiswaDataFromsupabaseClient()
-  return {};
-}
-
-function saveSiswaData(d) {
-  // Tidak dipakai lagi (data di supabaseClient)
-}
+function getSiswaData() { return {}; }
+function saveSiswaData(d) {}
 
 async function syncProgressSiswaKeGuru() {
   const u = getCurrentUser();
   if (!u || u.role !== 'siswa') return;
 
-  // Ambil progress lokal
   const progress = getProgress();
 
-  // Sync progress materi
   for (const materiId of Object.keys(progress.materi || {})) {
     if (progress.materi[materiId].selesai) {
-      await supabaseClientClient.from('progress').upsert({
+      await supabaseClient.from('progress').upsert({
         user_id: u.userId,
         materi_id: materiId,
         selesai: true
@@ -301,10 +267,9 @@ async function syncProgressSiswaKeGuru() {
     }
   }
 
-  // Sync latihan
   for (const materiId of Object.keys(progress.latihan || {})) {
     const l = progress.latihan[materiId];
-    await supabaseClientClient.from('latihan').insert({
+    await supabaseClient.from('latihan').insert({
       user_id: u.userId,
       materi_id: materiId,
       skor: l.skor,
@@ -317,13 +282,10 @@ async function syncProgressSiswaKeGuru() {
 /* ============================================================
    KOMPATIBILITAS
    ============================================================ */
-
 function getGuruData() { return getAuthData(); }
 function saveGuruData(d) { saveAuthData(d); }
-function loginGuru() { loginUser(); }
-function loginUser() { if (typeof loginGuru === 'function') loginGuru(); }
 function ubahUsernameGuru() { alert('Username tidak bisa diubah dari UI.'); }
 function ubahNamaGuru() { return ubahUsernameGuru(); }
 function hitungTotalLatihan() { return 0; }
-function buatKodeKelas() { alert('Fitur kode kelas tidak dipakai (pakai akun langsung).'); }
+function buatKodeKelas() { alert('Fitur kode kelas tidak dipakai.'); }
 function getKodeKelas() { return null; }

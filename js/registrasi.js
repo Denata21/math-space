@@ -10,6 +10,7 @@ const KELAS_OPTIONS = [
 
 const EMAIL_DOMAIN = '@mathspace.id';   // domain fiktif untuk internal
 
+/* ----- Render form registrasi ----- */
 function renderFormRegistrasi() {
   let kelasOptions = '<option value="">-- Pilih Kelas --</option>';
   KELAS_OPTIONS.forEach(k => {
@@ -74,6 +75,7 @@ function renderFormRegistrasi() {
   `;
 }
 
+/* ----- Validasi input ----- */
 function validasiRegistrasi(data) {
   const err = [];
 
@@ -108,6 +110,7 @@ function validasiRegistrasi(data) {
   return err;
 }
 
+/* ----- Proses submit ----- */
 async function submitRegistrasi() {
   const errorEl = document.getElementById('regError');
   const btn = document.getElementById('regSubmitBtn');
@@ -121,7 +124,7 @@ async function submitRegistrasi() {
     password2: document.getElementById('regPassword2').value
   };
 
-  // Validasi
+  // 1. Validasi frontend
   const err = validasiRegistrasi(data);
   if (err.length > 0) {
     errorEl.innerHTML = err.join('<br>');
@@ -132,12 +135,14 @@ async function submitRegistrasi() {
   btn.textContent = 'Mendaftar...';
 
   try {
-    // 1. Cek username sudah dipakai?
-    const { data: existing } = await supabase
+    // 2. Cek username sudah dipakai?
+    const { data: existing, error: cekErr } = await supabaseClient
       .from('profiles')
       .select('username')
       .eq('username', data.username)
       .maybeSingle();
+
+    if (cekErr) throw new Error('Gagal cek username: ' + cekErr.message);
 
     if (existing) {
       btn.disabled = false;
@@ -146,7 +151,7 @@ async function submitRegistrasi() {
       return;
     }
 
-    // 2. Sign up ke Supabase Auth
+    // 3. Sign up ke Supabase Auth
     const email = data.username + EMAIL_DOMAIN;
     const { data: authData, error: authError } = await supabaseClient.auth.signUp({
       email: email,
@@ -164,35 +169,43 @@ async function submitRegistrasi() {
     if (authError) {
       btn.disabled = false;
       btn.textContent = 'Daftar Sekarang →';
+
       if (authError.message.includes('already')) {
         errorEl.textContent = 'Username atau email sudah terdaftar.';
+      } else if (authError.message.includes('Password')) {
+        errorEl.textContent = 'Password terlalu lemah. Minimal 6 karakter.';
       } else {
         errorEl.textContent = authError.message;
       }
       return;
     }
 
-    // 3. Simpan ke tabel profiles
-    if (authData.user) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: authData.user.id,
-          username: data.username,
-          nama_lengkap: data.nama,
-          role: 'siswa',
-          kelas: data.kelas
-        });
-
-      if (profileError) {
-        btn.disabled = false;
-        btn.textContent = 'Daftar Sekarang →';
-        errorEl.textContent = 'Gagal menyimpan profil: ' + profileError.message;
-        return;
-      }
+    if (!authData.user) {
+      btn.disabled = false;
+      btn.textContent = 'Daftar Sekarang →';
+      errorEl.textContent = 'Gagal membuat akun. Coba lagi.';
+      return;
     }
 
-    // 4. Berhasil
+    // 4. Simpan ke tabel profiles
+    const { error: profileError } = await supabaseClient
+      .from('profiles')
+      .insert({
+        id: authData.user.id,
+        username: data.username,
+        nama_lengkap: data.nama,
+        role: 'siswa',
+        kelas: data.kelas
+      });
+
+    if (profileError) {
+      btn.disabled = false;
+      btn.textContent = 'Daftar Sekarang →';
+      errorEl.textContent = 'Gagal menyimpan profil: ' + profileError.message;
+      return;
+    }
+
+    // 5. Berhasil
     errorEl.innerHTML = `
       <div style="background:#dcfce7;color:#15803d;padding:14px;border-radius:8px;
                   border:1px solid #86efac;font-size:14px;">
@@ -203,7 +216,7 @@ async function submitRegistrasi() {
     btn.textContent = '✓ Terdaftar';
     btn.disabled = true;
 
-    // Auto-fill login form
+    // Auto-fill form login
     setTimeout(() => {
       switchAuthTab('login');
       setTimeout(() => {
@@ -218,5 +231,6 @@ async function submitRegistrasi() {
     btn.disabled = false;
     btn.textContent = 'Daftar Sekarang →';
     errorEl.textContent = 'Error: ' + e.message;
+    console.error('[Registrasi] Error:', e);
   }
 }

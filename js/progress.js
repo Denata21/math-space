@@ -1,8 +1,5 @@
 /* ============================================================
    PROGRESS TRACKING SISWA
-   - Tandai materi selesai dibaca
-   - Simpan skor latihan terakhir
-   - Tampilkan ringkasan progress di home & halaman progress
    ============================================================ */
 
 const PROGRESS_KEY = 'rm_progress';
@@ -25,7 +22,6 @@ function isMateriSelesai(materialId) {
 }
 
 function simpanSkorLatihan(materiId, skor, benar, total) {
-  // 1. Simpan lokal
   const p = getProgress();
   if (!p.latihan) p.latihan = {};
   const prev = p.latihan[materiId];
@@ -38,7 +34,6 @@ function simpanSkorLatihan(materiId, skor, benar, total) {
   };
   saveProgress(p);
 
-  // 2. Sync ke Supabase (async, fire & forget)
   syncLatihanKeSupabase(materiId, skor, benar, total);
 }
 
@@ -46,7 +41,7 @@ async function syncLatihanKeSupabase(materiId, skor, benar, total) {
   try {
     const user = getCurrentUser();
     if (!user || user.role !== 'siswa' || !user.userId) return;
-    if (typeof supabase === 'undefined') return;
+    if (typeof supabaseClient === 'undefined') return;
 
     await supabaseClient.from('latihan').insert({
       user_id: user.userId,
@@ -61,7 +56,6 @@ async function syncLatihanKeSupabase(materiId, skor, benar, total) {
 }
 
 function tandaiMateriSelesai(materialId) {
-  // 1. Simpan lokal
   const p = getProgress();
   if (!p.materi) p.materi = {};
   p.materi[materialId] = {
@@ -70,7 +64,6 @@ function tandaiMateriSelesai(materialId) {
   };
   saveProgress(p);
 
-  // 2. Sync ke Supabase
   syncProgressKeSupabase(materialId);
 }
 
@@ -78,7 +71,7 @@ async function syncProgressKeSupabase(materialId) {
   try {
     const user = getCurrentUser();
     if (!user || user.role !== 'siswa' || !user.userId) return;
-    if (typeof supabase === 'undefined') return;
+    if (typeof supabaseClient === 'undefined') return;
 
     await supabaseClient.from('progress').upsert({
       user_id: user.userId,
@@ -112,12 +105,11 @@ function hitungProgressKeseluruhan() {
     if (p.latihan && p.latihan[m.id]) latihanSelesai++;
   });
 
-  const persenMateri = totalMateri ? Math.round((materiSelesai / totalMateri) * 100) : 0;
-  const persenLatihan = totalLatihan ? Math.round((latihanSelesai / totalLatihan) * 100) : 0;
-
   return {
-    materiSelesai, totalMateri, persenMateri,
-    latihanSelesai, totalLatihan, persenLatihan
+    materiSelesai, totalMateri,
+    persenMateri: totalMateri ? Math.round((materiSelesai / totalMateri) * 100) : 0,
+    latihanSelesai, totalLatihan,
+    persenLatihan: totalLatihan ? Math.round((latihanSelesai / totalLatihan) * 100) : 0
   };
 }
 
