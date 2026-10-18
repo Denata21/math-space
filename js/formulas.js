@@ -1,400 +1,422 @@
 /* ============================================================
-   DEFINISI RUMUS — SEMUA MATERI
-   - Setiap tab: variabel, rumus, validasi konsistensi, teori
-   - Rumus dievaluasi oleh formula-engine.js
+   HALAMAN KALKULATOR — Router dengan Dropdown Materi
    ============================================================ */
 
-const FORMULAS = {
+let activeCalculator = 'bunga-tunggal';
 
-  /* ============================================================
-     1. BUNGA TUNGGAL
-     ============================================================ */
-  "bunga-tunggal": {
-    judul: "Bunga Tunggal",
-    deskripsi: "Bunga dihitung dari modal awal saja (tidak berbunga lagi).",
-    teori: `Bunga tunggal adalah bunga yang dihitung hanya berdasarkan modal awal (pokok), 
-tidak berdasarkan saldo yang sudah bertambah.
+function renderCalculatorPage() {
+  const app = document.getElementById('app');
+  if (!app) return;
 
-Konsep kunci:
-• Bunga (b) = M₀ × i × n
-• Modal akhir (Mn) = M₀ + b = M₀ (1 + i·n)
-• i = suku bunga per periode (desimal)
-• n = jumlah periode`,
-    variabel: [
-      { kode: "M0", label: "Modal Awal",   satuan: "Rp" },
-      { kode: "Mn", label: "Modal Akhir",  satuan: "Rp" },
-      { kode: "i",  label: "Suku Bunga",   satuan: "%"  },
-      { kode: "n",  label: "Lama Periode", satuan: "periode" },
-      { kode: "b",  label: "Bunga",        satuan: "Rp" }
-    ],
-      rumus: [
-      { target: "b",  ekspresi: "M0 * i * n" },
-      { target: "Mn", ekspresi: "M0 + b" },
-      { target: "i",  ekspresi: "b / (M0 * n)" },     // ← i dari b
-      { target: "n",  ekspresi: "b / (M0 * i)" },     // ← n dari b
-      { target: "b",  ekspresi: "Mn - M0" },
-      { target: "M0", ekspresi: "Mn - b" },
-      { target: "i",  ekspresi: "(Mn - M0) / (M0 * n)" },
-      { target: "n",  ekspresi: "(Mn - M0) / (M0 * i)" },
-      { target: "M0", ekspresi: "Mn / (1 + i * n)" }
-    ],
-    butuhTabel: false,
-    validasi: function(input) {
-      const err = [];
-      const M0 = parseFloat(input.M0);
-      const Mn = parseFloat(input.Mn);
-      const iRaw = parseFloat(input.i);
-      const i = (!isNaN(iRaw)) ? iRaw / 100 : NaN;
-      const n = parseFloat(input.n);
-      const b = parseFloat(input.b);
+  const daftar = [
+    { key: 'bunga-tunggal',  label: 'Bunga Tunggal',  icon: '💰' },
+    { key: 'bunga-majemuk',  label: 'Bunga Majemuk',  icon: '📈' },
+    { key: 'anuitas',        label: 'Anuitas',        icon: '🏦' },
+    { key: 'kesebangunan',   label: 'Kesebangunan',   icon: '📐' },
+    { key: 'statistika',     label: 'Statistika',     icon: '📊' },
+    { key: 'pencacahan',     label: 'Pencacahan',     icon: '🎲' }
+  ];
 
-      // Cek b vs M0·i·n
-      if (!isNaN(b) && !isNaN(i) && !isNaN(M0) && !isNaN(n)) {
-        const seharusnya = M0 * i * n;
-        const selisih = Math.abs(b - seharusnya);
-        const toleransi = Math.max(seharusnya * 0.01, 1);
-        if (selisih > toleransi) {
-          err.push({
-            pesan: 'Nilai <strong>b (Bunga)</strong> tidak konsisten dengan <strong>M0, i, n</strong>.',
-            detail: `Menurut M0 × i × n = ${formatAngkaEngine(seharusnya)}, tapi b = ${formatAngkaEngine(b)}.`,
-            saran: 'Hapus <strong>b</strong> agar dihitung otomatis, atau perbaiki <strong>M0/i/n</strong>.'
-          });
-        }
-      }
+  let optionsHtml = '';
+  daftar.forEach(function(c) {
+    optionsHtml += `<option value="${c.key}">${c.icon} - ${c.label}</option>`;
+  });
 
-      // Cek Mn vs M0+b
-      if (!isNaN(Mn) && !isNaN(M0) && !isNaN(b)) {
-        const seharusnya = M0 + b;
-        const selisih = Math.abs(Mn - seharusnya);
-        const toleransi = Math.max(seharusnya * 0.01, 1);
-        if (selisih > toleransi) {
-          err.push({
-            pesan: 'Nilai <strong>Mn (Modal Akhir)</strong> tidak konsisten dengan <strong>M0 + b</strong>.',
-            detail: `M0 + b = ${formatAngkaEngine(seharusnya)}, tapi Mn = ${formatAngkaEngine(Mn)}.`
-          });
-        }
-      }
+  app.innerHTML = `
+    <div class="hero" style="padding:32px 28px;">
+      <h2>Kalkulator Matematika</h2>
+      <p>Pilih materi, masukkan nilai yang diketahui, dan kosongkan variabel yang ingin ditanyakan.</p>
+    </div>
 
-      // Cek Mn vs M0(1+i·n)
-      if (!isNaN(Mn) && !isNaN(M0) && !isNaN(i) && !isNaN(n)) {
-        const seharusnya = M0 * (1 + i * n);
-        const selisih = Math.abs(Mn - seharusnya);
-        const toleransi = Math.max(seharusnya * 0.01, 1);
-        if (selisih > toleransi) {
-          err.push({
-            pesan: 'Nilai <strong>Mn</strong> tidak konsisten dengan <strong>M0 × (1 + i × n)</strong>.',
-            detail: `M0 × (1 + i × n) = ${formatAngkaEngine(seharusnya)}, tapi Mn = ${formatAngkaEngine(Mn)}.`
-          });
-        }
-      }
+    <div class="calc-panel" style="padding:20px 24px;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label style="font-size:14px;font-weight:600;">Pilih Materi</label>
+        <select class="form-control" id="calcMateri" style="font-size:15px;padding:12px;margin-top:6px;">
+          ${optionsHtml}
+        </select>
+      </div>
+    </div>
 
-      if (!isNaN(M0) && M0 < 0) err.push({ pesan: 'Modal awal tidak boleh negatif.' });
-      if (!isNaN(b)  && b  < 0) err.push({ pesan: 'Bunga tidak boleh negatif.' });
-      if (!isNaN(n)  && n  <= 0) err.push({ pesan: 'Lama periode harus > 0.' });
+    <div id="calcArea"></div>
+    <div id="calcHistoryArea"></div>
+  `;
 
-      return err;
+  const select = document.getElementById('calcMateri');
+  if (select) {
+    select.value = activeCalculator;
+    select.onchange = function() { 
+      switchCalculator(this.value); 
+    };
+  }
+
+  renderCalculatorContent(activeCalculator);
+}
+
+function switchCalculator(key) {
+  activeCalculator = key;
+  renderCalculatorContent(key);
+  const select = document.getElementById('calcMateri');
+  if (select) select.value = key;
+}
+
+function renderCalculatorContent(key) {
+  const area = document.getElementById('calcArea');
+  if (!area) return;
+  area.innerHTML = '';
+
+  const select = document.getElementById('calcMateri');
+  if (select && select.value !== key) select.value = key;
+
+  if (key === 'statistika' && typeof renderCalcStatistika === 'function') {
+    renderCalcStatistika(area);
+    renderCalcHistory('statistika');
+    return;
+  }
+
+  if (key === 'pencacahan' && typeof renderCalcPencacahan === 'function') {
+    renderCalcPencacahan(area);
+    renderCalcHistory('pencacahan');
+    return;
+  }
+
+  if (key === 'kesebangunan' && typeof renderCalcKesebangunan === 'function') {
+    renderCalcKesebangunan(area);
+    return;
+  }
+
+  const tab = FORMULAS[key];
+  if (!tab) {
+    area.innerHTML = `<div class="calc-panel"><p style="color:red;">Materi tidak ditemukan: ${key}</p></div>`;
+    return;
+  }
+
+  renderFormulaCalculator(area, key);
+  renderCalcHistory(key);
+}
+
+function renderFormulaCalculator(area, key) {
+  const tab = FORMULAS[key];
+
+  let html = `
+    <div class="calc-panel">
+      <div class="calc-hint">
+        <strong>${tab.judul}</strong> — ${tab.deskripsi}
+      </div>
+      <div class="form-row">
+  `;
+
+  tab.variabel.forEach(v => {
+    if (v.readonly) return;
+
+    const isRupiah = (v.satuan === 'Rp');
+
+    if (v.tipe === 'select' && v.opsi) {
+      let optionsHtml = '';
+      v.opsi.forEach(o => {
+        optionsHtml += `<option value="${o.value}">${o.label}</option>`;
+      });
+      html += `
+        <div class="form-group">
+          <label>${v.label}</label>
+          <select class="form-control" id="fv_${v.kode}">${optionsHtml}</select>
+        </div>
+      `;
+      return;
     }
-  },
 
-  /* ============================================================
-     2. BUNGA MAJEMUK
-     ============================================================ */
-  "bunga-majemuk": {
-    judul: "Bunga Majemuk",
-    deskripsi: "Bunga berbunga tiap periode (compounding).",
-    teori: `Bunga majemuk dihitung berdasarkan saldo terkini (modal + bunga yang sudah terakumulasi). 
-Dasar sistem keuangan modern: tabungan, deposito, kredit, investasi.
-
-Konsep kunci:
-• Mn = M₀ (1 + i)ⁿ
-• Bunga total = Mn − M₀
-• Bunga tumbuh eksponensial
-• i = suku bunga per periode, n = jumlah periode`,
-    variabel: [
-      { kode: "M0", label: "Modal Awal",   satuan: "Rp" },
-      { kode: "Mn", label: "Modal Akhir",  satuan: "Rp" },
-      { kode: "i",  label: "Suku Bunga",   satuan: "%"  },
-      { kode: "n",  label: "Lama Periode", satuan: "periode" },
-      { kode: "b",  label: "Bunga Total",  satuan: "Rp" }
-    ],
-    rumus: [
-      { target: "Mn", ekspresi: "M0 * pow(1 + i, n)" },
-      { target: "b",  ekspresi: "Mn - M0" },
-      { target: "M0", ekspresi: "Mn / pow(1 + i, n)" },
-      { target: "i",  ekspresi: "pow(Mn / M0, 1/n) - 1" },
-      { target: "n",  ekspresi: "log(Mn / M0) / log(1 + i)" },
-      { target: "Mn", ekspresi: "M0 + b" },
-      { target: "M0", ekspresi: "Mn - b" },
-      { target: "M0", ekspresi: "b / (pow(1 + i, n) - 1)" }
-    ],
-    butuhTabel: false,
-    validasi: function(input) {
-      const err = [];
-      const M0 = parseFloat(input.M0);
-      const Mn = parseFloat(input.Mn);
-      const iRaw = parseFloat(input.i);
-      const i = (!isNaN(iRaw)) ? iRaw / 100 : NaN;
-      const n = parseFloat(input.n);
-      const b = parseFloat(input.b);
-
-      if (!isNaN(Mn) && !isNaN(M0) && !isNaN(i) && !isNaN(n)) {
-        const seharusnya = M0 * Math.pow(1 + i, n);
-        const selisih = Math.abs(Mn - seharusnya);
-        const toleransi = Math.max(seharusnya * 0.01, 1);
-        if (selisih > toleransi) {
-          err.push({
-            pesan: 'Nilai <strong>Mn</strong> tidak konsisten dengan <strong>M0 × (1 + i)ⁿ</strong>.',
-            detail: `M0 × (1 + i)ⁿ = ${formatAngkaEngine(seharusnya)}, tapi Mn = ${formatAngkaEngine(Mn)}.`,
-            saran: 'Hapus <strong>Mn</strong> agar dihitung otomatis, atau perbaiki <strong>M0/i/n</strong>.'
-          });
-        }
-      }
-
-      if (!isNaN(b) && !isNaN(Mn) && !isNaN(M0)) {
-        const seharusnya = Mn - M0;
-        const selisih = Math.abs(b - seharusnya);
-        const toleransi = Math.max(seharusnya * 0.01, 1);
-        if (selisih > toleransi) {
-          err.push({
-            pesan: 'Nilai <strong>b (Bunga)</strong> tidak konsisten dengan <strong>Mn − M0</strong>.',
-            detail: `Mn − M0 = ${formatAngkaEngine(seharusnya)}, tapi b = ${formatAngkaEngine(b)}.`
-          });
-        }
-      }
-
-      if (!isNaN(M0) && M0 <= 0) err.push({ pesan: 'Modal awal harus > 0.' });
-      if (!isNaN(n)  && n  <= 0) err.push({ pesan: 'Lama periode harus > 0.' });
-      if (!isNaN(i)  && i  <= -1) err.push({ pesan: 'Suku bunga tidak valid.' });
-
-      return err;
+    if (isRupiah) {
+      html += `
+        <div class="form-group">
+          <label>
+            ${v.label} <code>${v.kode}</code>
+            <span style="color:var(--gray-text);font-weight:400;">(${v.satuan})</span>
+          </label>
+          <input type="text" inputmode="numeric" class="form-control input-rupiah"
+                 id="fv_${v.kode}" placeholder="kosongkan jika ditanya"
+                 oninput="handleRupiahInput(this)">
+        </div>
+      `;
+      return;
     }
-  },
 
-  /* ============================================================
-     3. ANUITAS
-     ============================================================ */
-  "anuitas": {
-    judul: "Anuitas",
-    deskripsi: "Pembayaran berkala dengan jumlah tetap, terdiri atas bunga dan angsuran pokok.",
-    teori: `Anuitas adalah pembayaran tetap setiap periode untuk melunasi pinjaman.
-Setiap pembayaran terdiri atas:
-• Bunga (dihitung dari sisa pinjaman)
-• Angsuran pokok (mengurangi sisa pinjaman)
+    html += `
+      <div class="form-group">
+        <label>
+          ${v.label} <code>${v.kode}</code>
+          <span style="color:var(--gray-text);font-weight:400;">(${v.satuan})</span>
+        </label>
+        <input type="number" step="any" class="form-control"
+               id="fv_${v.kode}" placeholder="kosongkan jika ditanya">
+      </div>
+    `;
+  });
 
-Konsep kunci:
-• A = M₀ · i / (1 − (1+i)⁻ⁿ)
-• Bunga periode ke-k = i × sisa awal
-• Angsuran pokok = A − bunga
-• Seiring waktu: porsi bunga ↓, porsi pokok ↑`,
-    variabel: [
-      { kode: "M0", label: "Pinjaman Awal", satuan: "Rp" },
-      { kode: "A",  label: "Anuitas",       satuan: "Rp" },
-      { kode: "i",  label: "Suku Bunga",    satuan: "%"  },
-      { kode: "n",  label: "Lama Periode",  satuan: "periode" }
-    ],
-    rumus: [
-      { target: "A",  ekspresi: "M0 * i / (1 - pow(1 + i, -n))" },
-      { target: "M0", ekspresi: "A * (1 - pow(1 + i, -n)) / i" },
-      { target: "n",  ekspresi: "-log(1 - M0 * i / A) / log(1 + i)" },
-      { target: "i",  ekspresi: "cariBungaAnuitas(M0, A, n)" }
-    ],
-    butuhTabel: true,
-    validasi: function(input) {
-      const err = [];
-      const M0 = parseFloat(input.M0);
-      const A  = parseFloat(input.A);
-      const iRaw = parseFloat(input.i);
-      const i = (!isNaN(iRaw)) ? iRaw / 100 : NaN;
-      const n = parseFloat(input.n);
+  html += `
+      </div>
+      <div id="formulaError" class="login-error"></div>
+      <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="runFormula()">Hitung</button>
+        <button class="btn btn-secondary" onclick="resetFormulaForm()">Reset</button>
+        <button class="btn btn-outline" onclick="showFormulaTheory('${key}')">📖 Lihat Teori</button>
+      </div>
+    </div>
 
-      if (!isNaN(A) && !isNaN(M0) && !isNaN(i) && !isNaN(n) && i > 0) {
-        const seharusnya = M0 * i / (1 - Math.pow(1 + i, -n));
-        const selisih = Math.abs(A - seharusnya);
-        const toleransi = Math.max(seharusnya * 0.01, 1);
-        if (selisih > toleransi) {
-          err.push({
-            pesan: 'Nilai <strong>A (Anuitas)</strong> tidak konsisten dengan <strong>M0, i, n</strong>.',
-            detail: `Menurut rumus A = ${formatAngkaEngine(seharusnya)}, tapi A = ${formatAngkaEngine(A)}.`,
-            saran: 'Hapus <strong>A</strong> agar dihitung otomatis, atau perbaiki <strong>M0/i/n</strong>.'
-          });
-        }
+    <div id="formulaTheory" style="display:none;"></div>
+    <div id="formulaResult"></div>
+  `;
+
+  area.innerHTML = html;
+}
+
+function handleRupiahInput(el) {
+  const raw = el.value;
+  if (!raw || raw.trim() === '') {
+    el.value = '';
+    return;
+  }
+  const cursorPos = el.selectionStart;
+  const lengthBefore = raw.length;
+  const formatted = formatRibuanInput(raw);
+  el.value = formatted;
+  const lengthAfter = formatted.length;
+  const diff = lengthAfter - lengthBefore;
+  el.setSelectionRange(cursorPos + diff, cursorPos + diff);
+}
+
+function showFormulaTheory(key) {
+  const tab = FORMULAS[key];
+  const el = document.getElementById('formulaTheory');
+  if (!el) return;
+
+  if (el.style.display === 'none') {
+    el.style.display = 'block';
+    el.innerHTML = `
+      <div class="calc-panel" style="background:#f0f7ff;border-color:var(--blue);">
+        <h3 style="font-size:15px;margin-bottom:10px;color:var(--blue-dark);">Teori: ${tab.judul}</h3>
+        <p style="font-size:14px;white-space:pre-line;line-height:1.8;">${tab.teori || tab.deskripsi}</p>
+      </div>
+    `;
+  } else {
+    el.style.display = 'none';
+    el.innerHTML = '';
+  }
+}
+
+function resetFormulaForm() {
+  const key = document.getElementById('calcMateri').value;
+  const tab = FORMULAS[key];
+  if (!tab) return;
+  
+  tab.variabel.forEach(function(v) {
+    const el = document.getElementById('fv_' + v.kode);
+    if (el) el.value = '';
+  });
+  const errEl = document.getElementById('formulaError');
+  if (errEl) errEl.innerHTML = '';
+  const resEl = document.getElementById('formulaResult');
+  if (resEl) resEl.innerHTML = '';
+}
+
+function runFormula() {
+  // PAKSA BACA DARI DROPDOWN
+  const selectEl = document.getElementById('calcMateri');
+  if (!selectEl) return;
+  
+  const key = selectEl.value;
+  console.log("Menghitung materi:", key); // Debugging log
+  
+  const tab = FORMULAS[key];
+  if (!tab) return;
+
+  const errEl = document.getElementById('formulaError');
+  errEl.textContent = '';
+  errEl.innerHTML = '';
+
+  const input = {};
+  tab.variabel.forEach(v => {
+    if (v.readonly) return;
+    const el = document.getElementById('fv_' + v.kode);
+    if (!el) return;
+    const val = el.value.trim();
+    if (val !== '') {
+      if (v.satuan === 'Rp') {
+        input[v.kode] = parseRibuanInput(val);
+      } else {
+        input[v.kode] = val;
       }
-
-      if (!isNaN(A) && !isNaN(M0) && !isNaN(i) && A <= M0 * i) {
-        err.push({
-          pesan: '<strong>A (Anuitas)</strong> terlalu kecil.',
-          detail: `Anuitas harus > M0 × i = ${formatAngkaEngine(M0 * i)} agar pinjaman bisa lunas.`,
-          saran: 'Perbesar nilai A, atau kecilkan i.'
-        });
-      }
-
-      if (!isNaN(M0) && M0 <= 0) err.push({ pesan: 'Pinjaman harus > 0.' });
-      if (!isNaN(A)  && A  <= 0) err.push({ pesan: 'Anuitas harus > 0.' });
-      if (!isNaN(n)  && n  <= 0) err.push({ pesan: 'Lama periode harus > 0.' });
-
-      return err;
     }
-  },
+  });
 
-  /* ============================================================
-     4. KESEBANGUNAN
-     ============================================================ */
-  "kesebangunan": {
-    judul: "Kesebangunan",
-    deskripsi: "Mencari sisi/tinggi yang belum diketahui pada dua bangun sebangun.",
-    teori: `Dua bangun datar dikatakan sebangun jika:
-1. Sudut-sudut yang bersesuaian sama besar
-2. Sisi-sisi yang bersesuaian memiliki perbandingan yang sama
-
-Konsep kunci (perbandingan senilai):
-• a/b = c/d
-• Jika a/b = c/d, maka a·d = b·c (perkalian silang)`,
-    variabel: [
-      { kode: "a", label: "Sisi a (bangun 1)", satuan: "satuan" },
-      { kode: "b", label: "Sisi b (bangun 1)", satuan: "satuan" },
-      { kode: "c", label: "Sisi c (bangun 2)", satuan: "satuan" },
-      { kode: "d", label: "Sisi d (bangun 2)", satuan: "satuan" }
-    ],
-    rumus: [
-      { target: "a", ekspresi: "b * c / d" },
-      { target: "b", ekspresi: "a * d / c" },
-      { target: "c", ekspresi: "a * d / b" },
-      { target: "d", ekspresi: "b * c / a" }
-    ],
-    butuhTabel: false,
-    validasi: function(input) {
-      const err = [];
-      const a = parseFloat(input.a);
-      const b = parseFloat(input.b);
-      const c = parseFloat(input.c);
-      const d = parseFloat(input.d);
-
-      if (!isNaN(a) && a <= 0) err.push({ pesan: 'Sisi a harus > 0.' });
-      if (!isNaN(b) && b <= 0) err.push({ pesan: 'Sisi b harus > 0.' });
-      if (!isNaN(c) && c <= 0) err.push({ pesan: 'Sisi c harus > 0.' });
-      if (!isNaN(d) && d <= 0) err.push({ pesan: 'Sisi d harus > 0.' });
-
-      if (!isNaN(a) && !isNaN(b) && !isNaN(c) && !isNaN(d)) {
-        const rasio1 = a / b;
-        const rasio2 = c / d;
-        const selisih = Math.abs(rasio1 - rasio2);
-        const toleransi = Math.max(rasio1 * 0.01, 0.001);
-
-        if (selisih > toleransi) {
-          err.push({
-            pesan: 'Nilai <strong>a/b</strong> tidak sama dengan <strong>c/d</strong>.',
-            detail: `a/b = ${formatAngkaEngine(rasio1)}, c/d = ${formatAngkaEngine(rasio2)}. Tidak sebangun.`,
-            saran: 'Perbaiki salah satu nilai, atau kosongkan 1 nilai agar dicari otomatis.'
-          });
-        }
-      }
-
-      const filled = [a, b, c, d].filter(x => !isNaN(x)).length;
-      if (filled < 3) {
-        err.push({
-          pesan: 'Isi minimal 3 nilai untuk bisa dihitung.',
-          detail: 'Kosongkan tepat 1 nilai yang ingin dicari.'
-        });
-      }
-
-      return err;
+  let result;
+  try {
+    result = solveFormulas(key, input); // Pakai 'key' dari dropdown
+  } catch (e) {
+    if (e.message === 'INPUT_TIDAK_KONSISTEN' && e.detail) {
+      let html = `<div class="warning-box" style="margin-top:12px;">`;
+      html += `<div class="warning-title">⚠️ Nilai tidak konsisten</div>`;
+      e.detail.forEach(item => {
+        html += `<div class="warning-item">`;
+        html += `<div><strong>${item.pesan}</strong></div>`;
+        if (item.detail) html += `<div style="font-size:13px;color:var(--gray-text);margin-top:4px;">${item.detail}</div>`;
+        if (item.saran) html += `<div style="font-size:13px;margin-top:6px;">💡 ${item.saran}</div>`;
+        html += `</div>`;
+      });
+      html += `<div style="margin-top:12px;font-size:13px;color:var(--gray-text);">
+        Perbaiki nilai yang diisi terlebih dahulu, lalu tekan <strong>Hitung</strong> lagi.
+      </div>`;
+      html += `</div>`;
+      errEl.innerHTML = html;
+      return;
     }
-  },
-
-  /* ============================================================
-     5. STATISTIKA (custom calculator)
-     ============================================================ */
-  "statistika": {
-    judul: "Statistika",
-    deskripsi: "Hitung mean, median, modus, kuartil, jangkauan dari data tunggal.",
-    teori: `Statistika deskriptif meringkas data menjadi ukuran pemusatan & penyebaran.
-
-Ukuran pemusatan:
-• Mean (rata-rata) = jumlah data / banyak data
-• Median = nilai tengah setelah diurutkan
-• Modus = nilai yang paling sering muncul
-
-Ukuran penyebaran:
-• Jangkauan = data terbesar − data terkecil
-• Q1, Q2, Q3 = kuartil`,
-    variabel: [
-      { kode: "data", label: "Data (pisahkan dengan koma)", satuan: "list", tipe: "list" },
-      { kode: "mean",   label: "Mean (rata-rata)", satuan: "angka", readonly: true },
-      { kode: "median", label: "Median",           satuan: "angka", readonly: true },
-      { kode: "modus",  label: "Modus",            satuan: "angka", readonly: true },
-      { kode: "q1",     label: "Kuartil 1 (Q1)",   satuan: "angka", readonly: true },
-      { kode: "q3",     label: "Kuartil 3 (Q3)",   satuan: "angka", readonly: true }
-    ],
-    rumus: [],
-    butuhTabel: false,
-    custom: "statistika"
-  },
-
-  /* ============================================================
-     6. PENCACAHAN (custom calculator)
-     ============================================================ */
-  "pencacahan": {
-    judul: "Pencacahan",
-    deskripsi: "Hitung faktorial, permutasi, dan kombinasi.",
-    teori: `Pencacahan (counting) menghitung banyaknya kemungkinan susunan/pilihan.
-
-Konsep kunci:
-• Faktorial: n! = n × (n−1) × ... × 2 × 1, dengan 0! = 1
-• Permutasi (urutan diperhatikan): nPr = n! / (n−r)!
-• Kombinasi (urutan tidak diperhatikan): nCr = n! / (r! (n−r)!)`,
-    variabel: [
-      { kode: "mode", label: "Jenis Perhitungan", satuan: "pilihan", tipe: "select",
-        opsi: [
-          { value: "faktorial",  label: "Faktorial (n!)" },
-          { value: "permutasi",  label: "Permutasi (nPr)" },
-          { value: "kombinasi",  label: "Kombinasi (nCr)" }
-        ] },
-      { kode: "n", label: "Nilai n", satuan: "angka" },
-      { kode: "r", label: "Nilai r (untuk permutasi/kombinasi)", satuan: "angka" },
-      { kode: "hasil", label: "Hasil", satuan: "angka", readonly: true }
-    ],
-    rumus: [],
-    butuhTabel: false,
-    custom: "pencacahan"
-  }
-};
-
-/* ============================================================
-   FUNGSI BANTU KHUSUS ANUITAS
-   Mencari i (suku bunga) secara iterasi
-   ============================================================ */
-
-function cariBungaAnuitas(M0, A, n) {
-  if (M0 <= 0 || A <= 0 || n <= 0) {
-    throw new Error('Nilai M0, A, n harus > 0.');
-  }
-  if (A <= M0 / n) {
-    throw new Error('Anuitas terlalu kecil, tidak bisa melunasi pinjaman.');
+    errEl.textContent = e.message;
+    return;
   }
 
-  let lo = 0.000001;
-  let hi = 10;
-  let iter = 0;
-  const maxIter = 200;
-  const tol = 1e-10;
-
-  function f(i) {
-    return M0 * i / (1 - Math.pow(1 + i, -n)) - A;
+  if (result.unresolved.length > 0) {
+    errEl.textContent = 'Variabel berikut belum bisa dihitung: '
+      + result.unresolved.join(', ')
+      + '. Coba isi lebih banyak variabel.';
+    return;
   }
 
-  while (f(hi) < 0 && hi < 1000) {
-    hi *= 2;
-    iter++;
-    if (iter > 50) break;
+  renderFormulaResult(result);
+  simpanRiwayat(key, input, result);
+}
+
+function renderFormulaResult(result) {
+  const tab = result.tab;
+  const area = document.getElementById('formulaResult');
+  if (!area) return;
+
+  let html = `<div class="calc-panel" style="margin-top:16px;">`;
+  html += `<h3 style="font-size:15px;margin-bottom:12px;color:var(--blue-dark);">Hasil dan Langkah Penyelesaian</h3>`;
+
+  const known = tab.variabel.filter(function(v) {
+    return result.values[v.kode] !== undefined && result.targets.indexOf(v.kode) === -1;
+  });
+  if (known.length > 0) {
+    html += `<div style="margin-bottom:12px;"><strong>Diketahui:</strong><ul style="margin:6px 0 0 20px;">`;
+    known.forEach(function(v) {
+      let val = result.values[v.kode];
+      if (v.kode === 'i') val = formatAngkaEngine(val * 100) + '%';
+      else if (v.satuan === 'Rp') val = formatRupiahEngine(val);
+      else val = formatAngkaEngine(val);
+      html += `<li>${v.kode} = ${val}</li>`;
+    });
+    html += `</ul></div>`;
   }
 
-  for (let k = 0; k < maxIter; k++) {
-    const mid = (lo + hi) / 2;
-    const fmid = f(mid);
-    if (Math.abs(fmid) < tol) return mid;
-    if (fmid > 0) hi = mid;
-    else lo = mid;
+  html += `<div style="margin-bottom:16px;"><strong>Ditanya:</strong> ${result.targets.join(', ')}</div>`;
+  html += `<h4 style="font-size:14px;margin-bottom:8px;">Langkah Penyelesaian</h4>`;
+  html += `<ol style="margin-left:20px;font-size:14px;line-height:1.9;">`;
+
+  result.steps.forEach(function(s) {
+    const varInfo = tab.variabel.find(function(v) { return v.kode === s.target; }) || {};
+    let hasilFmt;
+    if (s.target === 'i') hasilFmt = formatAngkaEngine(s.result * 100) + '%';
+    else if (varInfo.satuan === 'Rp') hasilFmt = formatRupiahEngine(s.result);
+    else if (typeof s.result === 'string') hasilFmt = s.result;
+    else hasilFmt = formatAngkaEngine(s.result);
+
+    html += `<li>`;
+    html += `<div><strong>${s.target}</strong> = <code>${s.ekspresi}</code></div>`;
+    html += `<div>= <strong>${hasilFmt}</strong></div>`;
+    html += `</li>`;
+  });
+
+  html += `</ol>`;
+
+  html += `<div class="example-box" style="margin-top:14px;">`;
+  html += `<strong>Jawaban Akhir:</strong><ul style="margin:6px 0 0 20px;">`;
+  result.targets.forEach(function(t) {
+    const info = tab.variabel.find(function(v) { return v.kode === t; }) || {};
+    const val = result.values[t];
+    let valFmt;
+    if (t === 'i') valFmt = formatAngkaEngine(val * 100) + '%';
+    else if (info.satuan === 'Rp') valFmt = formatRupiahEngine(val);
+    else if (typeof val === 'string') valFmt = val;
+    else valFmt = formatAngkaEngine(val);
+    html += `<li>${info.label || t} (${t}) = <strong>${valFmt}</strong></li>`;
+  });
+  html += `</ul></div></div>`;
+
+  if (tab.butuhTabel && result.values.M0 !== undefined && result.values.A !== undefined
+      && result.values.i !== undefined && result.values.n !== undefined) {
+    const rows = generateAnuitasTable(result.values.M0, result.values.A, result.values.i, result.values.n);
+    html += `<div class="calc-panel" style="margin-top:16px;">`;
+    html += `<h3 style="font-size:15px;margin-bottom:12px;color:var(--blue-dark);">Tabel Pelunasan</h3>`;
+    html += `<div class="table-wrap"><table><thead><tr>`;
+    html += `<th>Periode</th><th>Sisa Awal</th><th>Anuitas</th><th>Bunga</th><th>Angsuran Pokok</th><th>Sisa Akhir</th>`;
+    html += `</tr></thead><tbody>`;
+    rows.forEach(function(r) {
+      html += `<tr><td>${r.periode}</td>`;
+      html += `<td>${formatRupiahEngine(r.sisaAwal)}</td>`;
+      html += `<td>${formatRupiahEngine(r.anuitas)}</td>`;
+      html += `<td>${formatRupiahEngine(r.bunga)}</td>`;
+      html += `<td>${formatRupiahEngine(r.pokok)}</td>`;
+      html += `<td>${formatRupiahEngine(r.sisaAkhir)}</td></tr>`;
+    });
+    html += `</tbody></table></div></div>`;
   }
 
-  return (lo + hi) / 2;
+  area.innerHTML = html;
+}
+
+var RIWAYAT_KEY = 'rm_calc_history';
+var MAX_RIWAYAT = 10;
+
+function simpanRiwayat(materi, input, result) {
+  try {
+    var list = JSON.parse(localStorage.getItem(RIWAYAT_KEY) || '[]');
+    var ringkas = {};
+    result.targets.forEach(function(t) {
+      var v = result.values[t];
+      ringkas[t] = (typeof v === 'number') ? Math.round(v * 10000) / 10000 : v;
+    });
+    list.unshift({ materi: materi, input: input, waktu: new Date().toISOString(), ringkas: ringkas });
+    localStorage.setItem(RIWAYAT_KEY, JSON.stringify(list.slice(0, MAX_RIWAYAT)));
+    renderCalcHistory(materi);
+  } catch (e) {}
+}
+
+function renderCalcHistory(materi) {
+  var area = document.getElementById('calcHistoryArea');
+  if (!area) return;
+
+  var list = [];
+  try { list = JSON.parse(localStorage.getItem(RIWAYAT_KEY) || '[]'); } catch (e) { list = []; }
+  var filtered = list.filter(function(r) { return r.materi === materi; });
+  if (filtered.length === 0) { area.innerHTML = ''; return; }
+
+  var html = '<div class="calc-panel" style="margin-top:16px;">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">';
+  html += '<h3 style="font-size:15px;color:var(--blue-dark);">Riwayat Perhitungan (' + filtered.length + ')</h3>';
+  html += '<button class="btn btn-secondary btn-sm" onclick="hapusRiwayat()">Hapus Semua</button></div>';
+  html += '<div class="table-wrap"><table><thead><tr><th>Waktu</th><th>Input</th><th>Hasil</th></tr></thead><tbody>';
+
+  filtered.forEach(function(r) {
+    var waktu = new Date(r.waktu).toLocaleString('id-ID');
+    var inputStr = Object.entries(r.input).map(function(e) { return e[0] + '=' + e[1]; }).join(', ');
+    var hasilStr = Object.entries(r.ringkas).map(function(e) {
+      return e[0] + '=' + (typeof e[1] === 'number' ? e[1].toLocaleString('id-ID') : e[1]);
+    }).join(', ');
+    html += '<tr><td style="text-align:left;">' + waktu + '</td>';
+    html += '<td style="text-align:left;font-size:12px;">' + escapeHtml(inputStr) + '</td>';
+    html += '<td style="text-align:left;font-size:12px;font-weight:600;">' + escapeHtml(hasilStr) + '</td></tr>';
+  });
+
+  html += '</tbody></table></div></div>';
+  area.innerHTML = html;
+}
+
+function hapusRiwayat() {
+  if (!confirm('Hapus semua riwayat perhitungan?')) return;
+  localStorage.removeItem(RIWAYAT_KEY);
+  const key = document.getElementById('calcMateri') ? document.getElementById('calcMateri').value : 'bunga-tunggal';
+  renderCalcHistory(key);
+}
+
+function formatRupiah(angka) {
+  if (isNaN(angka) || !isFinite(angka)) return 'Rp0';
+  return 'Rp' + Math.round(angka).toLocaleString('id-ID');
 }
