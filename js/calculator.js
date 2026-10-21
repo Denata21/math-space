@@ -1,5 +1,7 @@
 /* ============================================================
-   HALAMAN KALKULATOR — Router dengan Dropdown Materi
+   HALAMAN KALKULATOR — Router Utama
+   - Anuitas: Menggunakan Mode Interaktif (Slider & Grafik)
+   - Lainnya: Menggunakan Form Biasa (dengan format ribuan)
    ============================================================ */
 
 let activeCalculator = 'bunga-tunggal';
@@ -11,7 +13,7 @@ function renderCalculatorPage() {
   const daftar = [
     { key: 'bunga-tunggal',  label: 'Bunga Tunggal',  icon: '💰' },
     { key: 'bunga-majemuk',  label: 'Bunga Majemuk',  icon: '📈' },
-    { key: 'anuitas',        label: 'Anuitas',        icon: '🏦' },
+    { key: 'anuitas',        label: 'Anuitas (Interaktif)', icon: '🏦' },
     { key: 'kesebangunan',   label: 'Kesebangunan',   icon: '📐' },
     { key: 'statistika',     label: 'Statistika',     icon: '📊' },
     { key: 'pencacahan',     label: 'Pencacahan',     icon: '🎲' }
@@ -53,13 +55,8 @@ function renderCalculatorPage() {
 }
 
 function switchCalculator(key) {
-  // 1. Update variabel global
   activeCalculator = key;
-  
-  // 2. Render ulang form sesuai key
   renderCalculatorContent(key);
-  
-  // 3. Pastikan dropdown value sinkron (jaga-jaga)
   const select = document.getElementById('calcMateri');
   if (select) select.value = key;
 }
@@ -73,7 +70,7 @@ function renderCalculatorContent(key) {
   const select = document.getElementById('calcMateri');
   if (select && select.value !== key) select.value = key;
 
-  // Custom calculators
+  // 1. CUSTOM CALCULATORS
   if (key === 'statistika' && typeof renderCalcStatistika === 'function') {
     renderCalcStatistika(area);
     renderCalcHistory('statistika');
@@ -91,7 +88,13 @@ function renderCalculatorContent(key) {
     return;
   }
 
-  // Formula Engine (Bunga Tunggal, Majemuk, Anuitas)
+  // 2. KALKULATOR INTERAKTIF (ANUITAS)
+  if (key === 'anuitas' && typeof renderKalkulatorInteraktif === 'function') {
+    renderKalkulatorInteraktif(area);
+    return;
+  }
+
+  // 3. KALKULATOR FORM BIASA (Bunga Tunggal, Majemuk)
   const tab = FORMULAS[key];
   if (!tab) {
     area.innerHTML = `<div class="calc-panel"><p style="color:red;">Materi tidak ditemukan: ${key}</p></div>`;
@@ -102,6 +105,9 @@ function renderCalculatorContent(key) {
   renderCalcHistory(key);
 }
 
+/* ============================================================
+   RENDER FORM KALKULATOR (Bunga Tunggal & Majemuk)
+   ============================================================ */
 function renderFormulaCalculator(area, key) {
   const tab = FORMULAS[key];
 
@@ -115,22 +121,7 @@ function renderFormulaCalculator(area, key) {
 
   tab.variabel.forEach(v => {
     if (v.readonly) return;
-
     const isRupiah = (v.satuan === 'Rp');
-
-    if (v.tipe === 'select' && v.opsi) {
-      let optionsHtml = '';
-      v.opsi.forEach(o => {
-        optionsHtml += `<option value="${o.value}">${o.label}</option>`;
-      });
-      html += `
-        <div class="form-group">
-          <label>${v.label}</label>
-          <select class="form-control" id="fv_${v.kode}">${optionsHtml}</select>
-        </div>
-      `;
-      return;
-    }
 
     if (isRupiah) {
       html += `
@@ -144,19 +135,18 @@ function renderFormulaCalculator(area, key) {
                  oninput="handleRupiahInput(this)">
         </div>
       `;
-      return;
+    } else {
+      html += `
+        <div class="form-group">
+          <label>
+            ${v.label} <code>${v.kode}</code>
+            <span style="color:var(--gray-text);font-weight:400;">(${v.satuan})</span>
+          </label>
+          <input type="number" step="any" class="form-control"
+                 id="fv_${v.kode}" placeholder="kosongkan jika ditanya">
+        </div>
+      `;
     }
-
-    html += `
-      <div class="form-group">
-        <label>
-          ${v.label} <code>${v.kode}</code>
-          <span style="color:var(--gray-text);font-weight:400;">(${v.satuan})</span>
-        </label>
-        <input type="number" step="any" class="form-control"
-               id="fv_${v.kode}" placeholder="kosongkan jika ditanya">
-      </div>
-    `;
   });
 
   html += `
@@ -175,6 +165,10 @@ function renderFormulaCalculator(area, key) {
 
   area.innerHTML = html;
 }
+
+/* ============================================================
+   HANDLER & UTIL KALKULATOR FORM
+   ============================================================ */
 
 function handleRupiahInput(el) {
   const raw = el.value;
@@ -226,7 +220,6 @@ function resetFormulaForm() {
 }
 
 function runFormula() {
-  // 👇 BACA LANGSUNG DARI DROPDOWN (Mencegah bug logika nyasar)
   const key = document.getElementById('calcMateri').value;
   const tab = FORMULAS[key];
   if (!tab) return;
@@ -252,7 +245,6 @@ function runFormula() {
 
   let result;
   try {
-    // 👇 GUNAKAN 'key' DARI DROPDOWN, BUKAN 'activeCalculator'
     result = solveFormulas(key, input);
   } catch (e) {
     if (e.message === 'INPUT_TIDAK_KONSISTEN' && e.detail) {
@@ -365,6 +357,10 @@ function renderFormulaResult(result) {
 
   area.innerHTML = html;
 }
+
+/* ============================================================
+   RIWAYAT PERHITUNGAN
+   ============================================================ */
 
 var RIWAYAT_KEY = 'rm_calc_history';
 var MAX_RIWAYAT = 10;
