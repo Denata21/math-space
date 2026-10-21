@@ -48,7 +48,6 @@ Konsep kunci:
       const n = parseFloat(input.n);
       const b = parseFloat(input.b);
 
-      // Cek b vs M0·i·n
       if (!isNaN(b) && !isNaN(i) && !isNaN(M0) && !isNaN(n)) {
         const seharusnya = M0 * i * n;
         const selisih = Math.abs(b - seharusnya);
@@ -62,7 +61,6 @@ Konsep kunci:
         }
       }
 
-      // Cek Mn vs M0+b
       if (!isNaN(Mn) && !isNaN(M0) && !isNaN(b)) {
         const seharusnya = M0 + b;
         const selisih = Math.abs(Mn - seharusnya);
@@ -75,7 +73,6 @@ Konsep kunci:
         }
       }
 
-      // Cek Mn vs M0(1+i·n)
       if (!isNaN(Mn) && !isNaN(M0) && !isNaN(i) && !isNaN(n)) {
         const seharusnya = M0 * (1 + i * n);
         const selisih = Math.abs(Mn - seharusnya);
@@ -123,10 +120,8 @@ Konsep kunci:
       { target: "M0", ekspresi: "Mn / pow(1 + i, n)" },
       { target: "i",  ekspresi: "pow(Mn / M0, 1/n) - 1" },
       { target: "n",  ekspresi: "log(Mn / M0) / log(1 + i)" },
-      // Kalau b diketahui → bisa cari Mn atau M0
       { target: "Mn", ekspresi: "M0 + b" },
       { target: "M0", ekspresi: "Mn - b" },
-      // Cari M0 dari b dan (i,n)
       { target: "M0", ekspresi: "b / (pow(1 + i, n) - 1)" }
     ],
     butuhTabel: false,
@@ -139,7 +134,6 @@ Konsep kunci:
       const n = parseFloat(input.n);
       const b = parseFloat(input.b);
 
-      // Cek Mn vs M0(1+i)^n
       if (!isNaN(Mn) && !isNaN(M0) && !isNaN(i) && !isNaN(n)) {
         const seharusnya = M0 * Math.pow(1 + i, n);
         const selisih = Math.abs(Mn - seharusnya);
@@ -153,7 +147,6 @@ Konsep kunci:
         }
       }
 
-      // Cek b vs Mn - M0
       if (!isNaN(b) && !isNaN(Mn) && !isNaN(M0)) {
         const seharusnya = Mn - M0;
         const selisih = Math.abs(b - seharusnya);
@@ -200,7 +193,6 @@ Konsep kunci:
       { target: "A",  ekspresi: "M0 * i / (1 - pow(1 + i, -n))" },
       { target: "M0", ekspresi: "A * (1 - pow(1 + i, -n)) / i" },
       { target: "n",  ekspresi: "-log(1 - M0 * i / A) / log(1 + i)" },
-      // Cari i pakai iterasi
       { target: "i",  ekspresi: "cariBungaAnuitas(M0, A, n)" }
     ],
     butuhTabel: true,
@@ -212,7 +204,6 @@ Konsep kunci:
       const i = (!isNaN(iRaw)) ? iRaw / 100 : NaN;
       const n = parseFloat(input.n);
 
-      // Cek A vs M0 · i / (1 - (1+i)^-n)
       if (!isNaN(A) && !isNaN(M0) && !isNaN(i) && !isNaN(n) && i > 0) {
         const seharusnya = M0 * i / (1 - Math.pow(1 + i, -n));
         const selisih = Math.abs(A - seharusnya);
@@ -226,7 +217,6 @@ Konsep kunci:
         }
       }
 
-      // Cek A harus > M0 × i (biar ada pelunasan)
       if (!isNaN(A) && !isNaN(M0) && !isNaN(i) && A <= M0 * i) {
         err.push({
           pesan: '<strong>A (Anuitas)</strong> terlalu kecil.',
@@ -276,13 +266,11 @@ Konsep kunci (perbandingan senilai):
       const c = parseFloat(input.c);
       const d = parseFloat(input.d);
 
-      // Cek semua nilai yang diisi harus > 0
       if (!isNaN(a) && a <= 0) err.push({ pesan: 'Sisi a harus > 0.' });
       if (!isNaN(b) && b <= 0) err.push({ pesan: 'Sisi b harus > 0.' });
       if (!isNaN(c) && c <= 0) err.push({ pesan: 'Sisi c harus > 0.' });
       if (!isNaN(d) && d <= 0) err.push({ pesan: 'Sisi d harus > 0.' });
 
-      // Cek konsistensi a/b = c/d (kalau 4 nilai terisi)
       if (!isNaN(a) && !isNaN(b) && !isNaN(c) && !isNaN(d)) {
         const rasio1 = a / b;
         const rasio2 = c / d;
@@ -298,7 +286,6 @@ Konsep kunci (perbandingan senilai):
         }
       }
 
-      // Cek minimal 3 nilai terisi
       const filled = [a, b, c, d].filter(x => !isNaN(x)).length;
       if (filled < 3) {
         err.push({
@@ -326,9 +313,7 @@ Ukuran pemusatan:
 
 Ukuran penyebaran:
 • Jangkauan = data terbesar − data terkecil
-• Q1, Q2, Q3 = kuartil
-
-Catatan: Input data dipisahkan dengan koma, contoh: 7, 8, 6, 8, 9`,
+• Q1, Q2, Q3 = kuartil`,
     variabel: [
       { kode: "data", label: "Data (pisahkan dengan koma)", satuan: "list", tipe: "list" },
       { kode: "mean",   label: "Mean (rata-rata)", satuan: "angka", readonly: true },
@@ -381,10 +366,6 @@ Contoh:
    ============================================================ */
 
 function cariBungaAnuitas(M0, A, n) {
-  // Gunakan metode bisection untuk mencari i
-  // dari persamaan: A = M0 · i / (1 - (1+i)^-n)
-  // → f(i) = M0·i/(1-(1+i)^-n) - A = 0
-
   if (M0 <= 0 || A <= 0 || n <= 0) {
     throw new Error('Nilai M0, A, n harus > 0.');
   }
@@ -393,7 +374,7 @@ function cariBungaAnuitas(M0, A, n) {
   }
 
   let lo = 0.000001;
-  let hi = 10; // 1000% — batas atas
+  let hi = 10;
   let iter = 0;
   const maxIter = 200;
   const tol = 1e-10;
@@ -402,7 +383,6 @@ function cariBungaAnuitas(M0, A, n) {
     return M0 * i / (1 - Math.pow(1 + i, -n)) - A;
   }
 
-  // Cari hi yang bikin f(hi) > 0
   while (f(hi) < 0 && hi < 1000) {
     hi *= 2;
     iter++;
