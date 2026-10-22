@@ -1,9 +1,9 @@
 /* ============================================================
-   HALAMAN LATIHAN SOAL
+   EXERCISE — Latihan soal (PG + jawaban angka)
    ============================================================ */
 
 let exerciseState = {
-  materi: 'anuitas',
+  materi: 'bunga-tunggal',
   tingkat: 'semua',
   questions: [],
   currentIndex: 0,
@@ -12,29 +12,39 @@ let exerciseState = {
   finished: false
 };
 
-function renderExercisePage(preselectedMateri) {
-  const materials = getMaterials();
-  const app = document.getElementById('app');
+/* ============================================================
+   RENDER HALAMAN LATIHAN
+   ============================================================ */
 
+function renderExercisePage(preselectedMateri) {
+  const app = document.getElementById('app');
+  if (!app) return;
+
+  const materials = getMaterials();
   if (preselectedMateri) exerciseState.materi = preselectedMateri;
 
-  let html = `
-    <div class="hero" style="padding:32px 28px;">
-      <h2>Latihan Soal</h2>
-      <p>Pilih materi dan tingkat kesulitan, lalu kerjakan soal. Jawaban dan pembahasan akan muncul setelah kamu menjawab.</p>
+  let optionsHtml = '';
+  materials.forEach(m => {
+    optionsHtml += `<option value="${m.id}" ${m.id === exerciseState.materi ? 'selected' : ''}>${escapeHtml(m.judul)}</option>`;
+  });
+
+  app.innerHTML = `
+    <div class="hero">
+      <h2 class="hero-title">📝 Latihan Soal</h2>
+      <p class="hero-subtitle">
+        Pilih materi dan tingkat kesulitan, lalu kerjakan soal. Jawaban dan pembahasan akan muncul setelah kamu menjawab.
+      </p>
     </div>
 
     <div class="calc-panel">
-      <div class="calc-hint">Pilih jawaban yang menurut Anda benar, kemudian tekan Periksa Jawaban.</div>
+      <div class="calc-hint">
+        Pilih jawaban yang menurutmu benar, lalu tekan <strong>Periksa Jawaban</strong>.
+      </div>
       <div class="form-row">
         <div class="form-group">
           <label>Materi</label>
           <select class="form-control" id="exMateri">
-  `;
-  materials.forEach(m => {
-    html += `<option value="${m.id}" ${m.id === exerciseState.materi ? 'selected' : ''}>${escapeHtml(m.judul)}</option>`;
-  });
-  html += `
+            ${optionsHtml}
           </select>
         </div>
         <div class="form-group">
@@ -52,9 +62,11 @@ function renderExercisePage(preselectedMateri) {
 
     <div id="exerciseArea"></div>
   `;
-
-  app.innerHTML = html;
 }
+
+/* ============================================================
+   MULAI
+   ============================================================ */
 
 function startExercise() {
   exerciseState.materi = document.getElementById('exMateri').value;
@@ -73,7 +85,7 @@ function startExercise() {
 
   if (exerciseState.questions.length === 0) {
     document.getElementById('exerciseArea').innerHTML =
-      '<div class="calc-panel"><p>Tidak ada soal untuk materi dan tingkat yang dipilih.</p></div>';
+      '<div class="calc-panel"><p class="text-muted">Tidak ada soal untuk materi dan tingkat yang dipilih.</p></div>';
     return;
   }
 
@@ -81,8 +93,14 @@ function startExercise() {
   renderQuestion();
 }
 
+/* ============================================================
+   RENDER SOAL
+   ============================================================ */
+
 function renderQuestion() {
   const area = document.getElementById('exerciseArea');
+  if (!area) return;
+
   const q = exerciseState.questions[exerciseState.currentIndex];
   const total = exerciseState.questions.length;
   const idx = exerciseState.currentIndex;
@@ -95,9 +113,9 @@ function renderQuestion() {
       <div class="q-meta">
         <span class="badge badge-materi">${escapeHtml(getMaterialName(q.materi))}</span>
         <span class="badge badge-${q.tingkat}">${q.tingkat.charAt(0).toUpperCase() + q.tingkat.slice(1)}</span>
-        <span style="font-size:12px;color:var(--gray-text);">Soal ${idx+1} dari ${total}</span>
+        <span style="font-size:12px;color:var(--text-muted);">Soal ${idx + 1} dari ${total}</span>
       </div>
-      <p class="question-text">${escapeHtml(q.pertanyaan).replace(/\n/g, '<br>')}</p>
+      <p class="question-text">${escapeHtml(q.pertanyaan)}</p>
   `;
 
   if (q.tipe === 'pg') {
@@ -106,18 +124,17 @@ function renderQuestion() {
       const letter = String.fromCharCode(65 + i);
       let cls = 'option';
       if (answered === letter) cls += ' selected';
-
       if (isChecked) {
         if (letter === q.jawaban) cls += ' correct';
         else if (answered === letter) cls += ' wrong';
       }
-
       html += `
         <label class="${cls}">
-          <input type="radio" name="opt_${idx}" value="${letter}" ${answered === letter ? 'checked' : ''}
+          <input type="radio" name="opt_${idx}" value="${letter}"
+                 ${answered === letter ? 'checked' : ''}
                  ${isChecked ? 'disabled' : ''}
                  onchange="selectAnswer(${idx}, '${letter}')">
-          <strong>${letter}.</strong> ${escapeHtml(p)}
+          <span><strong>${letter}.</strong> ${escapeHtml(p)}</span>
         </label>
       `;
     });
@@ -148,7 +165,6 @@ function renderQuestion() {
   if (idx > 0) {
     html += `<button class="btn btn-secondary" onclick="prevQuestion()">← Sebelumnya</button>`;
   }
-
   if (!isChecked) {
     const disabled = (answered === null || answered === '') ? 'disabled' : '';
     html += `<button class="btn btn-primary" id="checkAnswerBtn" onclick="checkCurrentAnswer()" ${disabled}>Periksa Jawaban</button>`;
@@ -159,7 +175,6 @@ function renderQuestion() {
       html += `<button class="btn btn-primary" onclick="finishExercise()">Lihat Skor Akhir</button>`;
     }
   }
-
   html += `</div>`;
   html += `</div>`;
   area.innerHTML = html;
@@ -167,11 +182,8 @@ function renderQuestion() {
 
 function selectAnswer(idx, value) {
   exerciseState.answers[idx] = value;
-
   const checkBtn = document.getElementById('checkAnswerBtn');
-  if (checkBtn) {
-    checkBtn.disabled = (value === null || value === '');
-  }
+  if (checkBtn) checkBtn.disabled = (value === null || value === '');
 }
 
 function checkCurrentAnswer() {
@@ -194,34 +206,32 @@ function nextQuestion() {
 function checkAnswer(q, userAnswer) {
   if (q.tipe === 'pg') {
     return userAnswer === q.jawaban;
-  } else {
-    const ua = parseFloat(userAnswer);
-    const correct = parseFloat(q.jawaban);
-    if (isNaN(ua)) return false;
-    return Math.abs(ua - correct) < 0.01;
   }
+  const ua = parseFloat(userAnswer);
+  const correct = parseFloat(q.jawaban);
+  if (isNaN(ua)) return false;
+  return Math.abs(ua - correct) < 0.01;
 }
+
+/* ============================================================
+   FINISH
+   ============================================================ */
 
 function finishExercise() {
   let correct = 0;
   let unanswered = 0;
+
   exerciseState.questions.forEach((q, i) => {
     const ans = exerciseState.answers[i];
-    if (ans === null || ans === '') {
-      unanswered++;
-    } else if (checkAnswer(q, ans)) {
-      correct++;
-    }
+    if (ans === null || ans === '') unanswered++;
+    else if (checkAnswer(q, ans)) correct++;
   });
+
   const total = exerciseState.questions.length;
   const score = Math.round((correct / total) * 100);
 
   if (typeof simpanSkorLatihan === 'function') {
     simpanSkorLatihan(exerciseState.materi, score, correct, total);
-  }
-    // BARU: sync ke data guru (kalau yang login siswa)
-  if (typeof syncProgressSiswaKeGuru === 'function') {
-    syncProgressSiswaKeGuru();
   }
 
   let subText = `Jawaban benar: ${correct} dari ${total} soal`;
@@ -232,15 +242,10 @@ function finishExercise() {
       <div class="score-num">${score}/100</div>
       <div class="score-sub">${subText}</div>
       <div style="margin-top:24px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
-        <button class="btn btn-primary" onclick="startExercise()">Coba Lagi</button>
-        <button class="btn btn-outline" onclick="navigate('progress')">Lihat Progress</button>
-        <button class="btn btn-outline" onclick="navigate('materials')">Kembali ke Materi</button>
+        <button class="btn btn-primary" onclick="startExercise()">🔄 Coba Lagi</button>
+        <button class="btn btn-outline" onclick="navigate('dashboard-siswa')">📊 Lihat Progres</button>
+        <button class="btn btn-outline" onclick="navigate('materials')">📖 Kembali ke Materi</button>
       </div>
     </div>
   `;
-}
-
-function getMaterialName(id) {
-  const m = getMaterials().find(x => x.id === id);
-  return m ? m.judul : id;
 }

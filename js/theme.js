@@ -1,8 +1,8 @@
 /* ============================================================
-   THEME — Dark Mode Toggle
+   THEME — Dark / Light Mode
    ============================================================ */
 
-const THEME_KEY = 'rm_theme';
+const THEME_KEY = 'ms_theme';
 
 function initTheme() {
   const saved = localStorage.getItem(THEME_KEY) || 'light';

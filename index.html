@@ -3,15 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#2563eb">
-  <meta name="description" content="Math Space — media pembelajaran matematika SMA/SMK: materi, latihan, kalkulator cerdas.">
-  <title>Math Space — Belajar • Berlatih • Memahami</title>
+  <meta name="theme-color" content="#0f2a4a">
+  <meta name="description" content="MathSpace — Belajar matematika melalui kalkulator eksploratif dan investigasi matematis.">
+  <title>MathSpace — Calculate • Explore • Investigate • Apply • Reflect</title>
 
-  <!-- PWA (opsional, bisa dihapus kalau belum siap) -->
-  <!-- <link rel="manifest" href="manifest.json"> -->
-  <!-- <link rel="icon" href="icon-192.png"> -->
-  <!-- <link rel="apple-touch-icon" href="icon-192.png"> -->
-
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -19,111 +17,110 @@
   <!-- ===== HEADER ===== -->
   <header class="site-header">
     <div class="container header-inner">
-      <div class="brand" onclick="navigate('home')">
+      <div class="brand" onclick="navigate('home')" role="button" tabindex="0">
         <span class="brand-icon">∑</span>
         <div>
-          <h1 class="brand-name">Math Space</h1>
-          <p class="brand-tagline">Belajar • Berlatih • Memahami</p>
+          <h1 class="brand-name">MathSpace</h1>
+          <p class="brand-tagline">Calculate • Explore • Investigate</p>
         </div>
       </div>
 
       <button class="hamburger" id="hamburgerBtn" aria-label="Menu">☰</button>
 
       <nav class="main-nav" id="mainNav">
-        <a href="#" data-page="home" class="nav-link active">Beranda</a>
+        <a href="#" data-page="home" class="nav-link">Beranda</a>
         <a href="#" data-page="materials" class="nav-link">Materi</a>
-        <a href="#" data-page="exercise" class="nav-link">Latihan</a>
         <a href="#" data-page="calculator" class="nav-link">Kalkulator</a>
-        <a href="#" data-page="progress" class="nav-link">Progress</a>
+        <a href="#" data-page="explorer" class="nav-link">Explorer</a>
+        <a href="#" data-page="detective" class="nav-link">Detective</a>
+        <a href="#" data-page="challenge" class="nav-link">Tantangan</a>
+        <a href="#" data-page="exercise" class="nav-link">Latihan</a>
       </nav>
 
-      <button class="btn-admin-login" id="themeToggleBtn" title="Mode gelap">🌙</button>
+      <button class="theme-toggle" id="themeToggleBtn" title="Mode gelap">🌙</button>
 
       <div id="userArea" class="user-area"></div>
     </div>
   </header>
 
   <!-- ===== MAIN CONTENT ===== -->
-  <main id="app" class="container"></main>
+  <main id="app" class="container" aria-live="polite">
+    <div class="hero" style="margin-top:32px;text-align:center;">
+      <p class="text-muted">Memuat MathSpace...</p>
+    </div>
+  </main>
 
   <!-- ===== FOOTER ===== -->
   <footer class="site-footer">
     <div class="container">
       <div class="footer-grid">
         <div class="footer-col">
-          <h4>Math Space</h4>
-          <p>Ruang belajar matematika untuk siswa SMA/SMK. Belajar, berlatih, dan memahami matematika dengan lebih mudah.</p>
+          <h4>MathSpace</h4>
+          <p>Platform pembelajaran matematika yang mengajak siswa memprediksi, mengeksplorasi, menyelidiki, menerapkan, dan merefleksikan hasil perhitungan matematis.</p>
         </div>
-
         <div class="footer-col">
           <h4>Informasi</h4>
           <p>Dwiki Dzakwan Yanata, S.Si</p>
-          <p>email : contoh@mail.com</p>
           <p>PPG Prajab Universitas PGRI Sumatera Barat</p>
         </div>
       </div>
-
       <div class="footer-bottom">
-        <p>© 2026 Math Space — Media Pembelajaran Matematika SMA/SMK</p>
+        <p>© 2026 MathSpace — Media Pembelajaran Matematika Kelas XI</p>
       </div>
     </div>
   </footer>
 
   <!-- ============================================================
-       SCRIPTS
-       Urutan WAJIB benar:
-       1. Supabase CDN (paling atas)
+       SCRIPTS — URUTAN WAJIB BENAR
+       1. Supabase CDN
        2. Data statis
-       3. Utils & Supabase client
-       4. Core (formula, progress)
+       3. Utils & Supabase client (file lu)
+       4. Core engine
        5. Auth & user
-       6. Fitur
-       7. Kalkulator
-       8. Halaman
-       9. App (paling akhir)
+       6. Aktivitas (explorer, detective, challenge)
+       7. Calculator & latihan
+       8. Dashboard
+       9. Router (paling akhir)
        ============================================================ -->
 
-  <!-- 1. Supabase JS Client (CDN) -->
+  <!-- 1. Supabase CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <!-- 2. Data statis -->
   <script src="data/materials.js"></script>
-  <script src="data/questions.js"></script>
   <script src="data/formulas.js"></script>
+  <script src="data/activities.js"></script>
+  <script src="data/questions.js"></script>
 
-  <!-- 3. Utils & Supabase Client -->
+  <!-- 3. Utils & Supabase client -->
   <script src="js/utils.js"></script>
   <script src="js/supabase-client.js"></script>
 
-  <!-- 4. Core -->
+  <!-- 4. Core engine -->
   <script src="js/formula-engine.js"></script>
-  <script src="js/progress.js"></script>
-  <script src="js/importexport.js"></script>
   <script src="js/theme.js"></script>
+  <script src="js/progress.js"></script>
 
-  <!-- 5. Auth & User -->
+  <!-- 5. Auth & user -->
   <script src="js/auth.js"></script>
-  <script src="js/registrasi.js"></script>
   <script src="js/profile.js"></script>
-  <script src="js/siswa-panel.js"></script>
 
-  <!-- 6. Fitur -->
-  <script src="js/grafik-statistika.js"></script>
-  <script src="js/landing.js"></script>
+  <!-- 6. Aktivitas (explorer, detective, challenge) -->
+  <script src="js/explorer.js"></script>
+  <script src="js/detective.js"></script>
+  <script src="js/challenge.js"></script>
 
-  <!-- 7. Kalkulator -->
-  <script src="js/calculators/calc-statistika.js"></script>
-  <script src="js/calculators/calc-pencacahan.js"></script>
-  <script src="js/calculator-interaktif.js"></script>
+  <!-- 7. Calculator & latihan -->
   <script src="js/calculator.js"></script>
-  <script src="js/formula-ui.js"></script>
-
-  <!-- 8. Halaman -->
-  <script src="js/material.js"></script>
   <script src="js/exercise.js"></script>
-  <script src="js/admin.js"></script>
 
-  <!-- 9. App (paling akhir) -->
+  <!-- 8. Dashboard -->
+  <script src="js/dashboard-guru.js"></script>
+  <script src="js/dashboard-siswa.js"></script>
+
+  <!-- 9. Router & landing (paling akhir) -->
+  <script src="js/landing.js"></script>
+  <script src="js/home.js"></script>
   <script src="js/app.js"></script>
 
 </body>

@@ -1,5 +1,5 @@
 /* ============================================================
-   FORMULA ENGINE
+   FORMULA ENGINE — Evaluasi rumus matematika
    ============================================================ */
 
 const MATH_FUNCS = {
@@ -17,6 +17,7 @@ const MATH_FUNCS = {
   cariBungaAnuitas: cariBungaAnuitas
 };
 
+/* ----- Evaluasi ekspresi dengan substitusi variabel ----- */
 function evalFormula(expr, vars) {
   let e = expr;
 
@@ -40,6 +41,7 @@ function evalFormula(expr, vars) {
   return Function('MATH_FUNCS', '"use strict"; return (' + e + ')')(MATH_FUNCS);
 }
 
+/* ----- Ekstrak variabel dari ekspresi ----- */
 function extractVars(expr, allVars) {
   const found = [];
   for (const v of allVars) {
@@ -50,13 +52,10 @@ function extractVars(expr, allVars) {
   return found;
 }
 
+/* ----- Solve: cari variabel yang belum diketahui ----- */
 function solveFormulas(tabKey, inputValues) {
   const tab = FORMULAS[tabKey];
-  if (!tab) throw new Error('Tab tidak ditemukan: ' + tabKey);
-
-  if (tab.custom) {
-    return solveCustom(tabKey, inputValues, tab);
-  }
+  if (!tab) throw new Error('Materi tidak ditemukan: ' + tabKey);
 
   if (typeof tab.validasi === 'function') {
     const errorValidasi = tab.validasi(inputValues);
@@ -69,14 +68,13 @@ function solveFormulas(tabKey, inputValues) {
 
   const values = {};
   const targets = [];
-  const allVarCodes = tab.variabel.filter(v => !v.readonly).map(v => v.kode);
+  const allVarCodes = tab.variabel.map(v => v.kode);
 
   const normalized = { ...inputValues };
   if (normalized.i !== undefined && normalized.i !== '' && normalized.i !== null) {
     normalized.i = parseFloat(normalized.i) / 100;
   }
 
-  // ===== BLOK PARSING YANG SEBELUMNYA NYASAR =====
   for (const v of allVarCodes) {
     const val = normalized[v];
 
@@ -104,7 +102,6 @@ function solveFormulas(tabKey, inputValues) {
       values[v] = num;
     }
   }
-  // ================================================
 
   if (targets.length === 0) {
     throw new Error('Semua variabel sudah terisi. Kosongkan minimal satu untuk ditanya.');
@@ -160,112 +157,7 @@ function solveFormulas(tabKey, inputValues) {
   };
 }
 
-function solveCustom(tabKey, inputValues, tab) {
-  if (tabKey === 'statistika') return solveStatistika(inputValues, tab);
-  if (tabKey === 'pencacahan') return solvePencacahan(inputValues, tab);
-  throw new Error('Custom calculator tidak dikenal: ' + tabKey);
-}
-
-function solveStatistika(input, tab) {
-  const raw = (input.data || '').toString().trim();
-  if (!raw) throw new Error('Isi data terlebih dahulu (pisahkan dengan koma).');
-
-  const arr = raw.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
-  if (arr.length === 0) throw new Error('Data tidak valid. Contoh: 7, 8, 6, 8, 9');
-
-  const sorted = [...arr].sort((a, b) => a - b);
-  const n = sorted.length;
-
-  const mean = arr.reduce((s, x) => s + x, 0) / n;
-
-  let median;
-  if (n % 2 === 1) median = sorted[(n - 1) / 2];
-  else median = (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
-
-  const freq = {};
-  arr.forEach(x => { freq[x] = (freq[x] || 0) + 1; });
-  let maxFreq = 0;
-  Object.values(freq).forEach(f => { if (f > maxFreq) maxFreq = f; });
-  const modusArr = Object.keys(freq).filter(k => freq[k] === maxFreq).map(Number);
-  const modus = maxFreq === 1 ? 'tidak ada' : modusArr.join(', ');
-
-  const q1 = hitungKuartil(sorted, 0.25);
-  const q3 = hitungKuartil(sorted, 0.75);
-
-  const values = { data: arr, mean, median, modus, q1, q3 };
-
-  const steps = [
-    { target: 'mean',   ekspresi: 'jumlah data / banyak data', needed: ['data'], values, result: mean },
-    { target: 'median', ekspresi: 'nilai tengah setelah diurutkan', needed: ['data'], values, result: median },
-    { target: 'modus',  ekspresi: 'nilai paling sering muncul', needed: ['data'], values, result: modus },
-    { target: 'q1',     ekspresi: 'kuartil bawah (25%)', needed: ['data'], values, result: q1 },
-    { target: 'q3',     ekspresi: 'kuartil atas (75%)', needed: ['data'], values, result: q3 }
-  ];
-
-  return { values, steps, targets: ['mean', 'median', 'modus', 'q1', 'q3'], unresolved: [], tab };
-}
-
-function hitungKuartil(sorted, p) {
-  const n = sorted.length;
-  const pos = (n - 1) * p;
-  const lo = Math.floor(pos);
-  const hi = Math.ceil(pos);
-  if (lo === hi) return sorted[lo];
-  return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
-}
-
-function faktorial(n) {
-  if (n < 0) throw new Error('Faktorial tidak terdefinisi untuk bilangan negatif.');
-  if (n > 170) throw new Error('Nilai terlalu besar (maks 170).');
-  let r = 1;
-  for (let i = 2; i <= n; i++) r *= i;
-  return r;
-}
-
-function solvePencacahan(input, tab) {
-  const mode = (input.mode || 'faktorial').toString();
-  const n = parseFloat(input.n);
-  const r = parseFloat(input.r);
-
-  if (isNaN(n) || n < 0) throw new Error('Nilai n harus bilangan ≥ 0.');
-  if (!Number.isInteger(n)) throw new Error('n harus bilangan bulat.');
-
-  let hasil, rumusStr, langkah;
-
-  if (mode === 'faktorial') {
-    hasil = faktorial(n);
-    rumusStr = `${n}!`;
-    langkah = `Hitung ${n}! = ${n} × ${n-1} × ... × 1 = ${hasil}`;
-  } else if (mode === 'permutasi') {
-    if (isNaN(r) || r < 0) throw new Error('Nilai r harus bilangan ≥ 0.');
-    if (!Number.isInteger(r)) throw new Error('r harus bilangan bulat.');
-    if (r > n) throw new Error('r tidak boleh lebih besar dari n.');
-    hasil = faktorial(n) / faktorial(n - r);
-    rumusStr = `${n}P${r} = ${n}! / (${n}−${r})!`;
-    langkah = `${n}P${r} = ${n}! / ${n - r}! = ${faktorial(n)} / ${faktorial(n - r)} = ${hasil}`;
-  } else {
-    if (isNaN(r) || r < 0) throw new Error('Nilai r harus bilangan ≥ 0.');
-    if (!Number.isInteger(r)) throw new Error('r harus bilangan bulat.');
-    if (r > n) throw new Error('r tidak boleh lebih besar dari n.');
-    hasil = faktorial(n) / (faktorial(r) * faktorial(n - r));
-    rumusStr = `${n}C${r} = ${n}! / (${r}! × (${n}−${r})!)`;
-    langkah = `${n}C${r} = ${n}! / (${r}! × ${n - r}!) = ${faktorial(n)} / (${faktorial(r)} × ${faktorial(n - r)}) = ${hasil}`;
-  }
-
-  const values = { mode, n, r, hasil };
-
-  const steps = [{
-    target: 'hasil',
-    ekspresi: rumusStr,
-    needed: mode === 'faktorial' ? ['n'] : ['n', 'r'],
-    values,
-    result: hasil,
-    detail: langkah
-  }];
-
-  return { values, steps, targets: ['hasil'], unresolved: [], tab };
-}
-
+/* ----- Generate tabel pelunasan anuitas ----- */
 function generateAnuitasTable(M0, A, i, n) {
   const rows = [];
   let sisa = M0;
@@ -282,7 +174,14 @@ function generateAnuitasTable(M0, A, i, n) {
       sisaAkhir = 0;
     }
 
-    rows.push({ periode: k, sisaAwal, anuitas: A, bunga: bungaK, pokok: pokokK, sisaAkhir });
+    rows.push({
+      periode: k,
+      sisaAwal,
+      anuitas: A,
+      bunga: bungaK,
+      pokok: pokokK,
+      sisaAkhir
+    });
 
     sisa = sisaAkhir;
     if (sisa <= 0.01) break;
@@ -291,11 +190,7 @@ function generateAnuitasTable(M0, A, i, n) {
   return rows;
 }
 
-function formatRupiahEngine(angka) {
-  if (!isFinite(angka)) return '—';
-  return 'Rp' + Math.round(angka).toLocaleString('id-ID');
-}
-
+/* ----- Format angka (dipakai di formulas.js validasi) ----- */
 function formatAngkaEngine(angka) {
   if (!isFinite(angka)) return '—';
   if (typeof angka === 'string') return angka;
@@ -303,12 +198,8 @@ function formatAngkaEngine(angka) {
   return rounded.toLocaleString('id-ID', { maximumFractionDigits: 4 });
 }
 
-function formatRibuanInput(str) {
-  let num = String(str).replace(/[^\d]/g, '');
-  if (!num) return '';
-  return parseInt(num, 10).toLocaleString('id-ID');
-}
-
-function parseRibuanInput(str) {
-  return String(str).replace(/\./g, '').replace(/,/g, '');
+/* ----- Format rupiah (dipakai di formulas.js validasi) ----- */
+function formatRupiahEngine(angka) {
+  if (!isFinite(angka)) return '—';
+  return 'Rp' + Math.round(angka).toLocaleString('id-ID');
 }

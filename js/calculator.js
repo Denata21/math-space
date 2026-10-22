@@ -1,38 +1,40 @@
 /* ============================================================
-   HALAMAN KALKULATOR — Router Utama
-   - Anuitas: Menggunakan Mode Interaktif (Slider & Grafik)
-   - Lainnya: Menggunakan Form Biasa (dengan format ribuan)
+   CALCULATOR — 3 modul: Bunga Tunggal, Bunga Majemuk, Anuitas
    ============================================================ */
 
 let activeCalculator = 'bunga-tunggal';
+
+/* ============================================================
+   RENDER HALAMAN KALKULATOR
+   ============================================================ */
 
 function renderCalculatorPage() {
   const app = document.getElementById('app');
   if (!app) return;
 
   const daftar = [
-    { key: 'bunga-tunggal',  label: 'Bunga Tunggal',  icon: '💰' },
-    { key: 'bunga-majemuk',  label: 'Bunga Majemuk',  icon: '📈' },
-    { key: 'anuitas',        label: 'Anuitas (Interaktif)', icon: '🏦' },
-    { key: 'kesebangunan',   label: 'Kesebangunan',   icon: '📐' },
-    { key: 'statistika',     label: 'Statistika',     icon: '📊' },
-    { key: 'pencacahan',     label: 'Pencacahan',     icon: '🎲' }
+    { key: 'bunga-tunggal', label: 'Bunga Tunggal', icon: '💰' },
+    { key: 'bunga-majemuk', label: 'Bunga Majemuk', icon: '📈' },
+    { key: 'anuitas',       label: 'Anuitas',       icon: '🏦' }
   ];
 
   let optionsHtml = '';
-  daftar.forEach(function(c) {
-    optionsHtml += `<option value="${c.key}">${c.icon} - ${c.label}</option>`;
+  daftar.forEach(c => {
+    optionsHtml += `<option value="${c.key}">${c.icon} ${c.label}</option>`;
   });
 
   app.innerHTML = `
-    <div class="hero" style="padding:32px 28px;">
-      <h2>Kalkulator Matematika</h2>
-      <p>Pilih materi, masukkan nilai yang diketahui, dan kosongkan variabel yang ingin ditanyakan.</p>
+    <div class="hero">
+      <h2 class="hero-title">🧮 Math Calculator</h2>
+      <p class="hero-subtitle">
+        Pilih materi, masukkan nilai yang diketahui, dan kosongkan variabel yang ingin ditanyakan.
+        Kalkulator akan menampilkan langkah penyelesaian, bukan hanya jawaban akhir.
+      </p>
     </div>
 
     <div class="calc-panel" style="padding:20px 24px;">
       <div class="form-group" style="margin-bottom:0;">
-        <label style="font-size:14px;font-weight:600;">Pilih Materi</label>
+        <label style="font-size:14px;">Pilih Materi</label>
         <select class="form-control" id="calcMateri" style="font-size:15px;padding:12px;margin-top:6px;">
           ${optionsHtml}
         </select>
@@ -40,14 +42,13 @@ function renderCalculatorPage() {
     </div>
 
     <div id="calcArea"></div>
-    <div id="calcHistoryArea"></div>
   `;
 
   const select = document.getElementById('calcMateri');
   if (select) {
     select.value = activeCalculator;
-    select.onchange = function() { 
-      switchCalculator(this.value); 
+    select.onchange = function () {
+      switchCalculator(this.value);
     };
   }
 
@@ -66,48 +67,22 @@ function renderCalculatorContent(key) {
   if (!area) return;
   area.innerHTML = '';
 
-  // Pastikan dropdown sinkron
   const select = document.getElementById('calcMateri');
   if (select && select.value !== key) select.value = key;
 
-  // 1. CUSTOM CALCULATORS
-  if (key === 'statistika' && typeof renderCalcStatistika === 'function') {
-    renderCalcStatistika(area);
-    renderCalcHistory('statistika');
-    return;
-  }
-
-  if (key === 'pencacahan' && typeof renderCalcPencacahan === 'function') {
-    renderCalcPencacahan(area);
-    renderCalcHistory('pencacahan');
-    return;
-  }
-
-  if (key === 'kesebangunan' && typeof renderCalcKesebangunan === 'function') {
-    renderCalcKesebangunan(area);
-    return;
-  }
-
-  // 2. KALKULATOR INTERAKTIF (ANUITAS)
-  if (key === 'anuitas' && typeof renderKalkulatorInteraktif === 'function') {
-    renderKalkulatorInteraktif(area);
-    return;
-  }
-
-  // 3. KALKULATOR FORM BIASA (Bunga Tunggal, Majemuk)
   const tab = FORMULAS[key];
   if (!tab) {
-    area.innerHTML = `<div class="calc-panel"><p style="color:red;">Materi tidak ditemukan: ${key}</p></div>`;
+    area.innerHTML = `<div class="calc-panel"><p style="color:var(--danger);">Materi tidak ditemukan: ${key}</p></div>`;
     return;
   }
 
   renderFormulaCalculator(area, key);
-  renderCalcHistory(key);
 }
 
 /* ============================================================
-   RENDER FORM KALKULATOR (Bunga Tunggal & Majemuk)
+   FORM KALKULATOR GENERIK
    ============================================================ */
+
 function renderFormulaCalculator(area, key) {
   const tab = FORMULAS[key];
 
@@ -120,30 +95,31 @@ function renderFormulaCalculator(area, key) {
   `;
 
   tab.variabel.forEach(v => {
-    if (v.readonly) return;
     const isRupiah = (v.satuan === 'Rp');
+    const labelHtml = `
+      <label>
+        ${v.label} <code>${v.kode}</code>
+        <span style="color:var(--text-muted);font-weight:400;">(${v.satuan})</span>
+      </label>
+    `;
 
     if (isRupiah) {
       html += `
         <div class="form-group">
-          <label>
-            ${v.label} <code>${v.kode}</code>
-            <span style="color:var(--gray-text);font-weight:400;">(${v.satuan})</span>
-          </label>
+          ${labelHtml}
           <input type="text" inputmode="numeric" class="form-control input-rupiah"
                  id="fv_${v.kode}" placeholder="kosongkan jika ditanya"
                  oninput="handleRupiahInput(this)">
+          ${v.deskripsi ? `<span class="hint">${escapeHtml(v.deskripsi)}</span>` : ''}
         </div>
       `;
     } else {
       html += `
         <div class="form-group">
-          <label>
-            ${v.label} <code>${v.kode}</code>
-            <span style="color:var(--gray-text);font-weight:400;">(${v.satuan})</span>
-          </label>
+          ${labelHtml}
           <input type="number" step="any" class="form-control"
                  id="fv_${v.kode}" placeholder="kosongkan jika ditanya">
+          ${v.deskripsi ? `<span class="hint">${escapeHtml(v.deskripsi)}</span>` : ''}
         </div>
       `;
     }
@@ -167,23 +143,8 @@ function renderFormulaCalculator(area, key) {
 }
 
 /* ============================================================
-   HANDLER & UTIL KALKULATOR FORM
+   TEORI
    ============================================================ */
-
-function handleRupiahInput(el) {
-  const raw = el.value;
-  if (!raw || raw.trim() === '') {
-    el.value = '';
-    return;
-  }
-  const cursorPos = el.selectionStart;
-  const lengthBefore = raw.length;
-  const formatted = formatRibuanInput(raw);
-  el.value = formatted;
-  const lengthAfter = formatted.length;
-  const diff = lengthAfter - lengthBefore;
-  el.setSelectionRange(cursorPos + diff, cursorPos + diff);
-}
 
 function showFormulaTheory(key) {
   const tab = FORMULAS[key];
@@ -193,9 +154,9 @@ function showFormulaTheory(key) {
   if (el.style.display === 'none') {
     el.style.display = 'block';
     el.innerHTML = `
-      <div class="calc-panel" style="background:#f0f7ff;border-color:var(--blue);">
-        <h3 style="font-size:15px;margin-bottom:10px;color:var(--blue-dark);">Teori: ${tab.judul}</h3>
-        <p style="font-size:14px;white-space:pre-line;line-height:1.8;">${tab.teori || tab.deskripsi}</p>
+      <div class="calc-panel" style="background:var(--navy-light);border-color:var(--teal);">
+        <h3 style="font-size:15px;margin-bottom:10px;color:var(--teal-dark);">📖 Teori: ${tab.judul}</h3>
+        <p style="font-size:14px;white-space:pre-line;line-height:1.8;margin:0;">${tab.teori || tab.deskripsi}</p>
       </div>
     `;
   } else {
@@ -204,12 +165,16 @@ function showFormulaTheory(key) {
   }
 }
 
+/* ============================================================
+   RESET
+   ============================================================ */
+
 function resetFormulaForm() {
   const key = document.getElementById('calcMateri').value;
   const tab = FORMULAS[key];
   if (!tab) return;
-  
-  tab.variabel.forEach(function(v) {
+
+  tab.variabel.forEach(v => {
     const el = document.getElementById('fv_' + v.kode);
     if (el) el.value = '';
   });
@@ -219,8 +184,15 @@ function resetFormulaForm() {
   if (resEl) resEl.innerHTML = '';
 }
 
+/* ============================================================
+   HITUNG
+   ============================================================ */
+
 function runFormula() {
-  const key = document.getElementById('calcMateri').value;
+  const selectEl = document.getElementById('calcMateri');
+  if (!selectEl) return;
+
+  const key = selectEl.value;
   const tab = FORMULAS[key];
   if (!tab) return;
 
@@ -230,7 +202,6 @@ function runFormula() {
 
   const input = {};
   tab.variabel.forEach(v => {
-    if (v.readonly) return;
     const el = document.getElementById('fv_' + v.kode);
     if (!el) return;
     const val = el.value.trim();
@@ -253,11 +224,11 @@ function runFormula() {
       e.detail.forEach(item => {
         html += `<div class="warning-item">`;
         html += `<div><strong>${item.pesan}</strong></div>`;
-        if (item.detail) html += `<div style="font-size:13px;color:var(--gray-text);margin-top:4px;">${item.detail}</div>`;
+        if (item.detail) html += `<div style="font-size:13px;color:var(--text-muted);margin-top:4px;">${item.detail}</div>`;
         if (item.saran) html += `<div style="font-size:13px;margin-top:6px;">💡 ${item.saran}</div>`;
         html += `</div>`;
       });
-      html += `<div style="margin-top:12px;font-size:13px;color:var(--gray-text);">
+      html += `<div style="margin-top:12px;font-size:13px;color:var(--text-muted);">
         Perbaiki nilai yang diisi terlebih dahulu, lalu tekan <strong>Hitung</strong> lagi.
       </div>`;
       html += `</div>`;
@@ -276,8 +247,11 @@ function runFormula() {
   }
 
   renderFormulaResult(result);
-  simpanRiwayat(key, input, result);
 }
+
+/* ============================================================
+   RENDER HASIL + LANGKAH
+   ============================================================ */
 
 function renderFormulaResult(result) {
   const tab = result.tab;
@@ -285,29 +259,33 @@ function renderFormulaResult(result) {
   if (!area) return;
 
   let html = `<div class="calc-panel" style="margin-top:16px;">`;
-  html += `<h3 style="font-size:15px;margin-bottom:12px;color:var(--blue-dark);">Hasil dan Langkah Penyelesaian</h3>`;
+  html += `<h3 style="font-size:15px;margin-bottom:14px;color:var(--teal-dark);">📋 Hasil dan Langkah Penyelesaian</h3>`;
 
-  const known = tab.variabel.filter(function(v) {
-    return result.values[v.kode] !== undefined && result.targets.indexOf(v.kode) === -1;
-  });
+  // Diketahui
+  const known = tab.variabel.filter(v =>
+    result.values[v.kode] !== undefined && result.targets.indexOf(v.kode) === -1
+  );
   if (known.length > 0) {
-    html += `<div style="margin-bottom:12px;"><strong>Diketahui:</strong><ul style="margin:6px 0 0 20px;">`;
-    known.forEach(function(v) {
+    html += `<div style="margin-bottom:14px;"><strong>Diketahui:</strong><ul style="margin:8px 0 0 22px;">`;
+    known.forEach(v => {
       let val = result.values[v.kode];
       if (v.kode === 'i') val = formatAngkaEngine(val * 100) + '%';
       else if (v.satuan === 'Rp') val = formatRupiahEngine(val);
       else val = formatAngkaEngine(val);
-      html += `<li>${v.kode} = ${val}</li>`;
+      html += `<li><code>${v.kode}</code> = ${val}</li>`;
     });
     html += `</ul></div>`;
   }
 
+  // Ditanya
   html += `<div style="margin-bottom:16px;"><strong>Ditanya:</strong> ${result.targets.join(', ')}</div>`;
-  html += `<h4 style="font-size:14px;margin-bottom:8px;">Langkah Penyelesaian</h4>`;
-  html += `<ol style="margin-left:20px;font-size:14px;line-height:1.9;">`;
 
-  result.steps.forEach(function(s) {
-    const varInfo = tab.variabel.find(function(v) { return v.kode === s.target; }) || {};
+  // Langkah
+  html += `<h4 style="font-size:14px;margin-bottom:10px;">Langkah Penyelesaian</h4>`;
+  html += `<ol style="margin-left:22px;font-size:14px;line-height:1.9;">`;
+
+  result.steps.forEach(s => {
+    const varInfo = tab.variabel.find(v => v.kode === s.target) || {};
     let hasilFmt;
     if (s.target === 'i') hasilFmt = formatAngkaEngine(s.result * 100) + '%';
     else if (varInfo.satuan === 'Rp') hasilFmt = formatRupiahEngine(s.result);
@@ -316,16 +294,17 @@ function renderFormulaResult(result) {
 
     html += `<li>`;
     html += `<div><strong>${s.target}</strong> = <code>${s.ekspresi}</code></div>`;
-    html += `<div>= <strong>${hasilFmt}</strong></div>`;
+    html += `<div style="color:var(--teal-dark);font-size:13px;margin-top:2px;">= <strong>${hasilFmt}</strong></div>`;
     html += `</li>`;
   });
 
   html += `</ol>`;
 
-  html += `<div class="example-box" style="margin-top:14px;">`;
-  html += `<strong>Jawaban Akhir:</strong><ul style="margin:6px 0 0 20px;">`;
-  result.targets.forEach(function(t) {
-    const info = tab.variabel.find(function(v) { return v.kode === t; }) || {};
+  // Jawaban akhir
+  html += `<div class="example-box" style="margin-top:16px;">`;
+  html += `<strong>Jawaban Akhir:</strong><ul style="margin:8px 0 0 22px;">`;
+  result.targets.forEach(t => {
+    const info = tab.variabel.find(v => v.kode === t) || {};
     const val = result.values[t];
     let valFmt;
     if (t === 'i') valFmt = formatAngkaEngine(val * 100) + '%';
@@ -336,15 +315,19 @@ function renderFormulaResult(result) {
   });
   html += `</ul></div></div>`;
 
-  if (tab.butuhTabel && result.values.M0 !== undefined && result.values.A !== undefined
-      && result.values.i !== undefined && result.values.n !== undefined) {
+  // Tabel pelunasan (anuitas)
+  if (tab.butuhTabel
+      && result.values.M0 !== undefined
+      && result.values.A !== undefined
+      && result.values.i !== undefined
+      && result.values.n !== undefined) {
     const rows = generateAnuitasTable(result.values.M0, result.values.A, result.values.i, result.values.n);
     html += `<div class="calc-panel" style="margin-top:16px;">`;
-    html += `<h3 style="font-size:15px;margin-bottom:12px;color:var(--blue-dark);">Tabel Pelunasan</h3>`;
+    html += `<h3 style="font-size:15px;margin-bottom:12px;color:var(--teal-dark);">📊 Tabel Pelunasan</h3>`;
     html += `<div class="table-wrap"><table><thead><tr>`;
     html += `<th>Periode</th><th>Sisa Awal</th><th>Anuitas</th><th>Bunga</th><th>Angsuran Pokok</th><th>Sisa Akhir</th>`;
     html += `</tr></thead><tbody>`;
-    rows.forEach(function(r) {
+    rows.forEach(r => {
       html += `<tr><td>${r.periode}</td>`;
       html += `<td>${formatRupiahEngine(r.sisaAwal)}</td>`;
       html += `<td>${formatRupiahEngine(r.anuitas)}</td>`;
@@ -352,71 +335,100 @@ function renderFormulaResult(result) {
       html += `<td>${formatRupiahEngine(r.pokok)}</td>`;
       html += `<td>${formatRupiahEngine(r.sisaAkhir)}</td></tr>`;
     });
-    html += `</tbody></table></div></div>`;
+    html += `</tbody></table></div>`;
+    html += `<p style="font-size:13px;color:var(--text-muted);margin-top:10px;">
+      Perhatikan: porsi bunga menurun, porsi angsuran pokok meningkat setiap periode. Total anuitas tetap.
+    </p>`;
+    html += `</div>`;
   }
 
   area.innerHTML = html;
 }
 
 /* ============================================================
-   RIWAYAT PERHITUNGAN
+   TAB KALKULATOR DI HALAMAN MATERI ANUITAS
+   (dipanggil dari home.js saat detail materi anuitas dibuka)
    ============================================================ */
 
-var RIWAYAT_KEY = 'rm_calc_history';
-var MAX_RIWAYAT = 10;
+let activeTabKey = 'bunga-tunggal';
 
-function simpanRiwayat(materi, input, result) {
-  try {
-    var list = JSON.parse(localStorage.getItem(RIWAYAT_KEY) || '[]');
-    var ringkas = {};
-    result.targets.forEach(function(t) {
-      var v = result.values[t];
-      ringkas[t] = (typeof v === 'number') ? Math.round(v * 10000) / 10000 : v;
-    });
-    list.unshift({ materi: materi, input: input, waktu: new Date().toISOString(), ringkas: ringkas });
-    localStorage.setItem(RIWAYAT_KEY, JSON.stringify(list.slice(0, MAX_RIWAYAT)));
-    renderCalcHistory(materi);
-  } catch (e) {}
-}
+function renderFormulaTabs(container) {
+  const tabKeys = Object.keys(FORMULAS);
 
-function renderCalcHistory(materi) {
-  var area = document.getElementById('calcHistoryArea');
-  if (!area) return;
+  let html = `
+    <h3 style="font-size:17px;margin:24px 0 12px;color:var(--teal-dark);
+               border-left:3px solid var(--teal);padding-left:12px;">
+      Latihan Berpola — Hitung Otomatis
+    </h3>
+    <p style="color:var(--text-muted);font-size:14px;margin-bottom:14px;">
+      Isi variabel yang diketahui. Kosongkan variabel yang ingin ditanyakan.
+      Klik <strong>Hitung</strong> untuk melihat langkah penyelesaian.
+    </p>
 
-  var list = [];
-  try { list = JSON.parse(localStorage.getItem(RIWAYAT_KEY) || '[]'); } catch (e) { list = []; }
-  var filtered = list.filter(function(r) { return r.materi === materi; });
-  if (filtered.length === 0) { area.innerHTML = ''; return; }
+    <div class="formula-tabs" id="formulaTabs">
+  `;
 
-  var html = '<div class="calc-panel" style="margin-top:16px;">';
-  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">';
-  html += '<h3 style="font-size:15px;color:var(--blue-dark);">Riwayat Perhitungan (' + filtered.length + ')</h3>';
-  html += '<button class="btn btn-secondary btn-sm" onclick="hapusRiwayat()">Hapus Semua</button></div>';
-  html += '<div class="table-wrap"><table><thead><tr><th>Waktu</th><th>Input</th><th>Hasil</th></tr></thead><tbody>';
-
-  filtered.forEach(function(r) {
-    var waktu = new Date(r.waktu).toLocaleString('id-ID');
-    var inputStr = Object.entries(r.input).map(function(e) { return e[0] + '=' + e[1]; }).join(', ');
-    var hasilStr = Object.entries(r.ringkas).map(function(e) {
-      return e[0] + '=' + (typeof e[1] === 'number' ? e[1].toLocaleString('id-ID') : e[1]);
-    }).join(', ');
-    html += '<tr><td style="text-align:left;">' + waktu + '</td>';
-    html += '<td style="text-align:left;font-size:12px;">' + escapeHtml(inputStr) + '</td>';
-    html += '<td style="text-align:left;font-size:12px;font-weight:600;">' + escapeHtml(hasilStr) + '</td></tr>';
+  tabKeys.forEach(key => {
+    const t = FORMULAS[key];
+    html += `
+      <button class="formula-tab ${key === activeTabKey ? 'active' : ''}"
+              data-key="${key}"
+              onclick="switchFormulaTab('${key}')">${t.judul}</button>
+    `;
   });
 
-  html += '</tbody></table></div></div>';
+  html += `</div><div id="formulaArea"></div>`;
+
+  container.innerHTML = html;
+  renderFormulaFormInMateri();
+}
+
+function switchFormulaTab(key) {
+  if (!FORMULAS[key]) return;
+  activeTabKey = key;
+
+  document.querySelectorAll('#formulaTabs .formula-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.key === key);
+  });
+
+  renderFormulaFormInMateri();
+}
+
+function renderFormulaFormInMateri() {
+  const tab = FORMULAS[activeTabKey];
+  const area = document.getElementById('formulaArea');
+  if (!area) return;
+
+  let html = `
+    <div class="calc-panel" style="margin-top:14px;">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">${tab.deskripsi}</p>
+      <div class="form-row">
+  `;
+
+  tab.variabel.forEach(v => {
+    const isRupiah = v.satuan === 'Rp';
+    html += `
+      <div class="form-group">
+        <label>${v.label} <code>${v.kode}</code>
+          <span style="color:var(--text-muted);font-weight:400;">(${v.satuan})</span>
+        </label>
+        <input type="${isRupiah ? 'text' : 'number'}" step="any" class="form-control ${isRupiah ? 'input-rupiah' : ''}"
+               id="fv_${v.kode}" placeholder="kosongkan jika ditanya"
+               ${isRupiah ? 'oninput="handleRupiahInput(this)" inputmode="numeric"' : ''}>
+      </div>
+    `;
+  });
+
+  html += `
+      </div>
+      <p class="login-error" id="formulaError"></p>
+      <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="runFormula()">Hitung</button>
+        <button class="btn btn-secondary" onclick="resetFormulaForm()">Reset</button>
+      </div>
+    </div>
+    <div id="formulaResult"></div>
+  `;
+
   area.innerHTML = html;
-}
-
-function hapusRiwayat() {
-  if (!confirm('Hapus semua riwayat perhitungan?')) return;
-  localStorage.removeItem(RIWAYAT_KEY);
-  const key = document.getElementById('calcMateri') ? document.getElementById('calcMateri').value : 'bunga-tunggal';
-  renderCalcHistory(key);
-}
-
-function formatRupiah(angka) {
-  if (isNaN(angka) || !isFinite(angka)) return 'Rp0';
-  return 'Rp' + Math.round(angka).toLocaleString('id-ID');
 }

@@ -1,11 +1,10 @@
 /* ============================================================
-   AUTENTIKASI — Berbasis Supabase Auth
-   Password TIDAK LAGI disimpan di frontend!
+   AUTH — Login, logout, session
    ============================================================ */
 
-const AUTH_KEY = 'rm_auth';
+const AUTH_KEY = 'ms_auth';
 
-/* ===== STATE LOGIN (hanya cache data non-sensitif) ===== */
+/* ----- State login (cache non-sensitif) ----- */
 function getAuthData() {
   try {
     return JSON.parse(localStorage.getItem(AUTH_KEY) || '{}');
@@ -45,35 +44,16 @@ function getCurrentUser() {
   };
 }
 
-function getUsernameGuru() {
-  const u = getCurrentUser();
-  return (u && u.role === 'guru') ? u.username : 'guru';
-}
-
-function getNamaGuru() {
-  const u = getCurrentUser();
-  return (u && u.role === 'guru') ? (u.nama || u.username) : 'Guru';
-}
-
-function getNamaSiswa() {
-  const u = getCurrentUser();
-  return (u && u.role === 'siswa') ? (u.nama || u.username) : 'Siswa';
-}
-
-function getKelasSiswa() {
-  const u = getCurrentUser();
-  return (u && u.role === 'siswa') ? (u.kelas || '-') : '-';
-}
-
 /* ============================================================
    CEK SESSION SAAT PAGE LOAD
    ============================================================ */
+
 async function cekSessionSupabase() {
   try {
+    if (typeof supabaseClient === 'undefined') return null;
+
     const { data: { session }, error } = await supabaseClient.auth.getSession();
-    if (error || !session) {
-      return null;
-    }
+    if (error || !session) return null;
 
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
@@ -81,9 +61,7 @@ async function cekSessionSupabase() {
       .eq('id', session.user.id)
       .single();
 
-    if (profileError || !profile) {
-      return null;
-    }
+    if (profileError || !profile) return null;
 
     const d = getAuthData();
     d.username = profile.username;
@@ -104,7 +82,12 @@ async function cekSessionSupabase() {
 /* ============================================================
    LOGIN
    ============================================================ */
+
 async function submitLogin(username, password) {
+  if (typeof supabaseClient === 'undefined') {
+    return { ok: false, error: 'Supabase client tidak termuat.' };
+  }
+
   const { data: profile, error: profileError } = await supabaseClient
     .from('profiles')
     .select('id, username, role, nama_lengkap, kelas')
@@ -126,9 +109,6 @@ async function submitLogin(username, password) {
     if (authError.message.includes('Invalid login')) {
       return { ok: false, error: 'Username atau password salah.' };
     }
-    if (authError.message.includes('Email not confirmed')) {
-      return { ok: false, error: 'Email belum diverifikasi.' };
-    }
     return { ok: false, error: authError.message };
   }
 
@@ -146,8 +126,9 @@ async function submitLogin(username, password) {
 }
 
 /* ============================================================
-   LOGOUT (FIX ERROR)
+   LOGOUT
    ============================================================ */
+
 async function logoutUser() {
   if (!confirm('Logout dari akun ini?')) return;
 
@@ -156,22 +137,20 @@ async function logoutUser() {
       await supabaseClient.auth.signOut();
     }
   } catch (e) {
-    console.warn('[Auth] Gagal signOut Supabase:', e);
-  } finally {
-    localStorage.removeItem(AUTH_KEY);
-    if (typeof renderUserArea === 'function') renderUserArea();
-    if (typeof updateHeaderVisibility === 'function') updateHeaderVisibility();
-    if (typeof renderLandingPage === 'function') renderLandingPage();
+    console.warn('[Auth] Gagal signOut:', e);
   }
-}
 
-function logoutGuru() { logoutUser(); }
-function loginGuru() { loginUser(); }
-function loginUser() { if (typeof loginGuru === 'function') loginGuru(); }
+  localStorage.removeItem(AUTH_KEY);
+
+  if (typeof renderUserArea === 'function') renderUserArea();
+  if (typeof updateHeaderVisibility === 'function') updateHeaderVisibility();
+  if (typeof renderLandingPage === 'function') renderLandingPage();
+}
 
 /* ============================================================
    ROUTING SETELAH LOGIN
    ============================================================ */
+
 function routeAfterLogin() {
   const u = getCurrentUser();
   if (!u) {
@@ -182,17 +161,20 @@ function routeAfterLogin() {
   if (typeof updateHeaderVisibility === 'function') updateHeaderVisibility();
 
   if (u.role === 'guru') {
-    navigate('admin-dashboard');
+    navigate('dashboard-guru');
   } else {
     navigate('home');
   }
 }
 
 /* ============================================================
-   DATA SISWA (Untuk Panel Guru)
+   DATA SISWA UNTUK GURU
    ============================================================ */
+
 async function getSiswaDataFromSupabase() {
   try {
+    if (typeof supabaseClient === 'undefined') return {};
+
     const { data: siswaList, error: err1 } = await supabaseClient
       .from('profiles')
       .select('id, username, nama_lengkap, kelas')
@@ -220,6 +202,7 @@ async function getSiswaDataFromSupabase() {
       const latihanSiswa = latihanList.filter(l => l.user_id === s.id);
 
       result[s.username] = {
+        id: s.id,
         username: s.username,
         nama: s.nama_lengkap,
         kelas: s.kelas,
@@ -227,14 +210,20 @@ async function getSiswaDataFromSupabase() {
       };
 
       progressSiswa.forEach(p => {
-        if (p.selesai) result[s.username].progress.materi[p.materi_id] = { selesai: true };
+        if (p.selesai) {
+          result[s.username].progress.materi[p.materi_id] = { selesai: true };
+        }
       });
 
       const latihanByMateri = {};
       latihanSiswa.forEach(l => {
         if (!latihanByMateri[l.materi_id] || l.skor > latihanByMateri[l.materi_id].skor) {
           latihanByMateri[l.materi_id] = {
-            skor: l.skor, benar: l.benar, total: l.total, terbaik: l.skor, waktu: l.waktu
+            skor: l.skor,
+            benar: l.benar,
+            total: l.total,
+            terbaik: l.skor,
+            waktu: l.waktu
           };
         }
       });
@@ -243,49 +232,29 @@ async function getSiswaDataFromSupabase() {
 
     return result;
   } catch (e) {
-    console.error('[Supabase] Error ambil data siswa:', e);
+    console.error('[Auth] Error ambil data siswa:', e);
     return {};
   }
 }
 
-function getSiswaData() { return {}; }
-function saveSiswaData(d) {}
+/* ============================================================
+   DATA AKTIVITAS SISWA UNTUK GURU
+   ============================================================ */
 
-async function syncProgressSiswaKeGuru() {
-  const u = getCurrentUser();
-  if (!u || u.role !== 'siswa') return;
+async function getAktivitasSiswaFromSupabase() {
+  try {
+    if (typeof supabaseClient === 'undefined') return [];
 
-  const progress = getProgress();
+    const { data, error } = await supabaseClient
+      .from('aktivitas_siswa')
+      .select('*')
+      .order('waktu', { ascending: false })
+      .limit(200);
 
-  for (const materiId of Object.keys(progress.materi || {})) {
-    if (progress.materi[materiId].selesai) {
-      await supabaseClient.from('progress').upsert({
-        user_id: u.userId,
-        materi_id: materiId,
-        selesai: true
-      }, { onConflict: 'user_id,materi_id' });
-    }
-  }
-
-  for (const materiId of Object.keys(progress.latihan || {})) {
-    const l = progress.latihan[materiId];
-    await supabaseClient.from('latihan').insert({
-      user_id: u.userId,
-      materi_id: materiId,
-      skor: l.skor,
-      benar: l.benar || 0,
-      total: l.total || 0
-    });
+    if (error) throw error;
+    return data || [];
+  } catch (e) {
+    console.warn('[Auth] Error ambil aktivitas:', e);
+    return [];
   }
 }
-
-/* ============================================================
-   KOMPATIBILITAS
-   ============================================================ */
-function getGuruData() { return getAuthData(); }
-function saveGuruData(d) { saveAuthData(d); }
-function ubahUsernameGuru() { alert('Username tidak bisa diubah dari UI.'); }
-function ubahNamaGuru() { return ubahUsernameGuru(); }
-function hitungTotalLatihan() { return 0; }
-function buatKodeKelas() { alert('Fitur kode kelas tidak dipakai.'); }
-function getKodeKelas() { return null; }

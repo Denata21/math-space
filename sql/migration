@@ -1,0 +1,170 @@
+-- ============================================================
+-- MATHSPACE — MIGRATION
+-- Tabel baru: aktivitas_siswa (Explorer, Detective, Challenge)
+-- RLS: siswa hanya bisa akses data sendiri, guru bisa baca semua
+-- ============================================================
+
+-- ============================================================
+-- 1. TABEL aktivitas_siswa
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.aktivitas_siswa (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  tipe TEXT NOT NULL CHECK (tipe IN ('explorer', 'detective', 'challenge')),
+  aktivitas_id TEXT NOT NULL,
+  params JSONB,
+  pengamatan TEXT,
+  jawaban_numerik TEXT,
+  alasan TEXT,
+  waktu TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Index untuk query cepat
+CREATE INDEX IF NOT EXISTS idx_aktivitas_user ON public.aktivitas_siswa(user_id);
+CREATE INDEX IF NOT EXISTS idx_aktivitas_tipe ON public.aktivitas_siswa(tipe);
+CREATE INDEX IF NOT EXISTS idx_aktivitas_waktu ON public.aktivitas_siswa(waktu DESC);
+
+-- ============================================================
+-- 2. AKTIFKAN RLS
+-- ============================================================
+
+ALTER TABLE public.aktivitas_siswa ENABLE ROW LEVEL SECURITY;
+
+-- ============================================================
+-- 3. RLS POLICY
+-- ============================================================
+
+-- Siswa: bisa INSERT aktivitas miliknya sendiri
+CREATE POLICY "siswa_insert_aktivitas_sendiri"
+  ON public.aktivitas_siswa
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = user_id);
+
+-- Siswa: bisa SELECT aktivitas miliknya sendiri
+CREATE POLICY "siswa_select_aktivitas_sendiri"
+  ON public.aktivitas_siswa
+  FOR SELECT
+  TO authenticated
+  USING (auth.uid() = user_id);
+
+-- Guru: bisa SELECT semua aktivitas
+CREATE POLICY "guru_select_semua_aktivitas"
+  ON public.aktivitas_siswa
+  FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE profiles.id = auth.uid()
+      AND profiles.role = 'guru'
+    )
+  );
+
+-- ============================================================
+-- 4. CEK RLS UNTUK TABEL YANG SUDAH ADA
+-- Jalankan ini kalau belum yakin RLS di tabel lama sudah aktif
+-- ============================================================
+
+-- Tabel profiles
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "profiles_select_sendiri_atau_guru" ON public.profiles;
+CREATE POLICY "profiles_select_sendiri_atau_guru"
+  ON public.profiles
+  FOR SELECT
+  TO authenticated
+  USING (
+    auth.uid() = id
+    OR EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = auth.uid() AND p.role = 'guru'
+    )
+  );
+
+DROP POLICY IF EXISTS "profiles_insert_sendiri" ON public.profiles;
+CREATE POLICY "profiles_insert_sendiri"
+  ON public.profiles
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = id);
+
+-- Tabel progress
+ALTER TABLE public.progress ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "progress_siswa_sendiri" ON public.progress;
+CREATE POLICY "progress_siswa_sendiri"
+  ON public.progress
+  FOR ALL
+  TO authenticated
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "progress_guru_select" ON public.progress;
+CREATE POLICY "progress_guru_select"
+  ON public.progress
+  FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE profiles.id = auth.uid() AND profiles.role = 'guru'
+    )
+  );
+
+-- Tabel latihan
+ALTER TABLE public.latihan ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "latihan_siswa_sendiri" ON public.latihan;
+CREATE POLICY "latihan_siswa_sendiri"
+  ON public.latihan
+  FOR ALL
+  TO authenticated
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "latihan_guru_select" ON public.latihan;
+CREATE POLICY "latihan_guru_select"
+  ON public.latihan
+  FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE profiles.id = auth.uid() AND profiles.role = 'guru'
+    )
+  );
+
+-- ============================================================
+-- 5. TRIGGER: auto-create profile setelah sign up
+-- (opsional — kalau belum ada)
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, username, nama_lengkap, role, kelas)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'username', split_part(NEW.email, '@', 1)),
+    COALESCE(NEW.raw_user_meta_data->>'nama_lengkap', 'Siswa Baru'),
+    COALESCE(NEW.raw_user_meta_data->>'role', 'siswa'),
+    NEW.raw_user_meta_data->>'kelas'
+  )
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- ============================================================
+-- SELESAI
+-- ============================================================
+
+-- Verifikasi:
+-- SELECT * FROM pg_policies WHERE tablename IN ('profiles', 'progress', 'latihan', 'aktivitas_siswa');

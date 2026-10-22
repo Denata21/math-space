@@ -1,8 +1,12 @@
 /* ============================================================
-   PROGRESS TRACKING SISWA
+   PROGRESS — Tracking belajar siswa (lokal + Supabase)
    ============================================================ */
 
-const PROGRESS_KEY = 'rm_progress';
+const PROGRESS_KEY = 'ms_progress';
+
+/* ============================================================
+   STATE LOKAL
+   ============================================================ */
 
 function getProgress() {
   try {
@@ -16,10 +20,45 @@ function saveProgress(p) {
   localStorage.setItem(PROGRESS_KEY, JSON.stringify(p));
 }
 
+/* ============================================================
+   MATERI
+   ============================================================ */
+
 function isMateriSelesai(materialId) {
   const p = getProgress();
   return !!(p.materi && p.materi[materialId] && p.materi[materialId].selesai);
 }
+
+function tandaiMateriSelesai(materialId) {
+  const p = getProgress();
+  if (!p.materi) p.materi = {};
+  p.materi[materialId] = {
+    selesai: true,
+    waktu: new Date().toISOString()
+  };
+  saveProgress(p);
+  syncProgressKeSupabase(materialId);
+}
+
+async function syncProgressKeSupabase(materialId) {
+  try {
+    const user = getCurrentUser();
+    if (!user || user.role !== 'siswa' || !user.userId) return;
+    if (typeof supabaseClient === 'undefined') return;
+
+    await supabaseClient.from('progress').upsert({
+      user_id: user.userId,
+      materi_id: materialId,
+      selesai: true
+    }, { onConflict: 'user_id,materi_id' });
+  } catch (e) {
+    console.warn('[Progress] Gagal sync progress:', e);
+  }
+}
+
+/* ============================================================
+   LATIHAN
+   ============================================================ */
 
 function simpanSkorLatihan(materiId, skor, benar, total) {
   const p = getProgress();
@@ -33,7 +72,6 @@ function simpanSkorLatihan(materiId, skor, benar, total) {
     waktu: new Date().toISOString()
   };
   saveProgress(p);
-
   syncLatihanKeSupabase(materiId, skor, benar, total);
 }
 
@@ -55,138 +93,157 @@ async function syncLatihanKeSupabase(materiId, skor, benar, total) {
   }
 }
 
-function tandaiMateriSelesai(materialId) {
-  const p = getProgress();
-  if (!p.materi) p.materi = {};
-  p.materi[materialId] = {
-    selesai: true,
-    waktu: new Date().toISOString()
-  };
-  saveProgress(p);
-
-  syncProgressKeSupabase(materialId);
-}
-
-async function syncProgressKeSupabase(materialId) {
-  try {
-    const user = getCurrentUser();
-    if (!user || user.role !== 'siswa' || !user.userId) return;
-    if (typeof supabaseClient === 'undefined') return;
-
-    await supabaseClient.from('progress').upsert({
-      user_id: user.userId,
-      materi_id: materialId,
-      selesai: true
-    }, { onConflict: 'user_id,materi_id' });
-  } catch (e) {
-    console.warn('[Progress] Gagal sync progress:', e);
-  }
-}
-
 function getSkorLatihan(materiId) {
   const p = getProgress();
   return (p.latihan && p.latihan[materiId]) || null;
 }
 
+/* ============================================================
+   AKTIVITAS: EXPLORER
+   Simpan parameter terakhir + pengamatan siswa
+   ============================================================ */
+
+function simpanHasilExplorer(explorerId, params, pengamatan) {
+  const p = getProgress();
+  if (!p.explorer) p.explorer = {};
+  p.explorer[explorerId] = {
+    params,
+    pengamatan: pengamatan || '',
+    waktu: new Date().toISOString()
+  };
+  saveProgress(p);
+  syncAktivitasKeSupabase('explorer', explorerId, {
+    params,
+    pengamatan: pengamatan || '',
+    jawaban_numerik: null,
+    alasan: pengamatan || ''
+  });
+}
+
+function getHasilExplorer(explorerId) {
+  const p = getProgress();
+  return (p.explorer && p.explorer[explorerId]) || null;
+}
+
+/* ============================================================
+   AKTIVITAS: DETECTIVE
+   Simpan jawaban + alasan siswa
+   ============================================================ */
+
+function simpanHasilDetective(detectiveId, jawabanSiswa, alasan) {
+  const p = getProgress();
+  if (!p.detective) p.detective = {};
+  p.detective[detectiveId] = {
+    jawaban: jawabanSiswa,
+    alasan: alasan || '',
+    waktu: new Date().toISOString()
+  };
+  saveProgress(p);
+  syncAktivitasKeSupabase('detective', detectiveId, {
+    params: null,
+    pengamatan: '',
+    jawaban_numerik: jawabanSiswa,
+    alasan: alasan || ''
+  });
+}
+
+function getHasilDetective(detectiveId) {
+  const p = getProgress();
+  return (p.detective && p.detective[detectiveId]) || null;
+}
+
+/* ============================================================
+   AKTIVITAS: CHALLENGE
+   Simpan strategi, jawaban, dan refleksi
+   ============================================================ */
+
+function simpanHasilChallenge(challengeId, data) {
+  const p = getProgress();
+  if (!p.challenge) p.challenge = {};
+  p.challenge[challengeId] = {
+    prediksi: data.prediksi || '',
+    strategi: data.strategi || '',
+    jawaban: data.jawaban || '',
+    alasan: data.alasan || '',
+    refleksi: data.refleksi || '',
+    waktu: new Date().toISOString()
+  };
+  saveProgress(p);
+  syncAktivitasKeSupabase('challenge', challengeId, {
+    params: null,
+    pengamatan: data.refleksi || '',
+    jawaban_numerik: data.jawaban || null,
+    alasan: data.alasan || ''
+  });
+}
+
+function getHasilChallenge(challengeId) {
+  const p = getProgress();
+  return (p.challenge && p.challenge[challengeId]) || null;
+}
+
+/* ============================================================
+   SYNC AKTIVITAS KE SUPABASE
+   Semua aktivitas (explorer/detective/challenge) masuk ke tabel
+   yang sama: aktivitas_siswa
+   ============================================================ */
+
+async function syncAktivitasKeSupabase(tipe, aktivitasId, data) {
+  try {
+    const user = getCurrentUser();
+    if (!user || user.role !== 'siswa' || !user.userId) return;
+    if (typeof supabaseClient === 'undefined') return;
+
+    await supabaseClient.from('aktivitas_siswa').insert({
+      user_id: user.userId,
+      tipe: tipe,
+      aktivitas_id: aktivitasId,
+      params: data.params,
+      pengamatan: data.pengamatan,
+      jawaban_numerik: data.jawaban_numerik,
+      alasan: data.alasan,
+      waktu: new Date().toISOString()
+    });
+  } catch (e) {
+    console.warn('[Progress] Gagal sync aktivitas:', e);
+  }
+}
+
+/* ============================================================
+   RINGKASAN
+   ============================================================ */
+
 function hitungProgressKeseluruhan() {
   const materials = getMaterials();
   const p = getProgress();
-  const totalMateri = materials.length;
 
   let materiSelesai = 0;
   materials.forEach(m => {
     if (p.materi && p.materi[m.id] && p.materi[m.id].selesai) materiSelesai++;
   });
 
-  let totalLatihan = 0;
-  let latihanSelesai = 0;
-  materials.forEach(m => {
-    totalLatihan++;
-    if (p.latihan && p.latihan[m.id]) latihanSelesai++;
-  });
+  const latihanSelesai = Object.keys(p.latihan || {}).length;
+  const explorerSelesai = Object.keys(p.explorer || {}).length;
+  const detectiveSelesai = Object.keys(p.detective || {}).length;
+  const challengeSelesai = Object.keys(p.challenge || {}).length;
 
   return {
-    materiSelesai, totalMateri,
-    persenMateri: totalMateri ? Math.round((materiSelesai / totalMateri) * 100) : 0,
-    latihanSelesai, totalLatihan,
-    persenLatihan: totalLatihan ? Math.round((latihanSelesai / totalLatihan) * 100) : 0
+    materiSelesai,
+    totalMateri: materials.length,
+    persenMateri: materials.length ? Math.round((materiSelesai / materials.length) * 100) : 0,
+    latihanSelesai,
+    totalLatihan: materials.length,
+    persenLatihan: materials.length ? Math.round((latihanSelesai / materials.length) * 100) : 0,
+    explorerSelesai,
+    detectiveSelesai,
+    challengeSelesai
   };
 }
 
-function renderProgressPage() {
-  const app = document.getElementById('app');
-  const materials = getMaterials();
-  const p = getProgress();
-  const ringkasan = hitungProgressKeseluruhan();
-
-  let html = `
-    <div class="hero" style="padding:32px 28px;">
-      <h2>Progress Belajar</h2>
-      <p>Pantau materi yang sudah kamu pelajari dan skor latihanmu.</p>
-    </div>
-
-    <div class="calc-panel">
-      <div class="result-grid">
-        <div class="result-card">
-          <div class="label">Materi Selesai</div>
-          <div class="value">${ringkasan.materiSelesai}/${ringkasan.totalMateri}
-            <span style="font-size:13px;color:var(--gray-text);">(${ringkasan.persenMateri}%)</span>
-          </div>
-        </div>
-        <div class="result-card">
-          <div class="label">Latihan Dikerjakan</div>
-          <div class="value">${ringkasan.latihanSelesai}/${ringkasan.totalLatihan}
-            <span style="font-size:13px;color:var(--gray-text);">(${ringkasan.persenLatihan}%)</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <h3 class="section-title">Rincian per Materi</h3>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th style="text-align:left;">Materi</th>
-            <th>Status Baca</th>
-            <th>Skor Latihan</th>
-            <th>Skor Terbaik</th>
-            <th>Aksi</th>
-          </tr>
-        </thead>
-        <tbody>
-  `;
-
-  materials.forEach(m => {
-    const selesai = p.materi && p.materi[m.id] && p.materi[m.id].selesai;
-    const latihan = p.latihan && p.latihan[m.id];
-
-    html += `<tr>
-      <td style="text-align:left;"><strong>${escapeHtml(m.judul)}</strong></td>
-      <td>${selesai ? '✅ Selesai' : '—'}</td>
-      <td>${latihan ? latihan.skor + '/100' : '—'}</td>
-      <td>${latihan ? (latihan.terbaik || 0) + '/100' : '—'}</td>
-      <td style="text-align:center;">
-        <button class="btn btn-primary btn-sm" onclick="navigate('material-detail','${m.id}')">Buka</button>
-      </td>
-    </tr>`;
-  });
-
-  html += `
-        </tbody>
-      </table>
-    </div>
-
-    <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;">
-      <button class="btn btn-danger btn-sm" onclick="resetProgress()">Reset Progress</button>
-    </div>
-  `;
-
-  app.innerHTML = html;
-}
-
 function resetProgress() {
-  if (!confirm('Yakin ingin menghapus semua progress belajar?')) return;
+  if (!confirm('Yakin ingin menghapus semua progress belajar? Tindakan ini tidak bisa dibatalkan.')) return;
   localStorage.removeItem(PROGRESS_KEY);
-  renderProgressPage();
+  if (typeof renderProgressPage === 'function') {
+    renderProgressPage();
+  }
 }
