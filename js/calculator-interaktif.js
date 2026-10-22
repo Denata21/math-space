@@ -1,5 +1,5 @@
 /* ============================================================
-   KALKULATOR ANUITAS INTERAKTIF (Slider & Grafik)
+   KALKULATOR ANUITAS INTERAKTIF (Slider & Grafik Real-Time)
    ============================================================ */
 
 function renderKalkulatorInteraktif(container) {
@@ -15,21 +15,6 @@ function renderKalkulatorInteraktif(container) {
           <input type="text" id="int_M0" class="form-control input-rupiah" value="20.000.000" oninput="handleRupiahInput(this); updateKalkulatorInteraktif();">
         </div>
         <div class="form-group">
-          <label>Suku Bunga per Tahun (i): <span id="lbl_i" style="color:var(--blue); font-weight:bold;">10%</span></label>
-          <input type="range" id="int_i" min="1" max="20" step="0.5" value="10" 
-                 oninput="document.getElementById('lbl_i').innerText = this.value + '%'; updateKalkulatorInteraktif();"
-                 style="width:100%; cursor:pointer;">
-        </div>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label>Lama Pinjaman (n): <span id="lbl_n" style="color:var(--blue); font-weight:bold;">3 Tahun</span></label>
-          <input type="range" id="int_n" min="1" max="10" step="1" value="3" 
-                 oninput="document.getElementById('lbl_n').innerText = this.value + ' Tahun'; updateKalkulatorInteraktif();"
-                 style="width:100%; cursor:pointer;">
-        </div>
-        <div class="form-group">
           <label>Frekuensi Bayar</label>
           <select id="int_freq" class="form-control" onchange="updateKalkulatorInteraktif()">
             <option value="12">Bulanan (12x/tahun)</option>
@@ -37,6 +22,18 @@ function renderKalkulatorInteraktif(container) {
             <option value="1">Tahunan (1x/tahun)</option>
           </select>
         </div>
+      </div>
+
+      <div class="form-group" style="margin-top: 10px;">
+        <label>Suku Bunga per Tahun (i): <span id="lbl_i" style="color:var(--blue); font-weight:bold; font-size:16px;">10%</span></label>
+        <input type="range" id="int_i" class="custom-slider" min="1" max="20" step="0.5" value="10" 
+               oninput="document.getElementById('lbl_i').innerText = this.value + '%'; updateKalkulatorInteraktif();">
+      </div>
+
+      <div class="form-group" style="margin-top: 20px;">
+        <label>Lama Pinjaman (n): <span id="lbl_n" style="color:var(--blue); font-weight:bold; font-size:16px;">3 Tahun</span></label>
+        <input type="range" id="int_n" class="custom-slider" min="1" max="10" step="1" value="3" 
+               oninput="document.getElementById('lbl_n').innerText = this.value + ' Tahun'; updateKalkulatorInteraktif();">
       </div>
 
       <div id="int_result" style="margin-top:20px; padding-top:20px; border-top:2px dashed var(--gray-border);"></div>
@@ -84,46 +81,63 @@ function updateKalkulatorInteraktif() {
       </div>
     </div>
 
-    <div style="margin-top:20px;">
-      <h4 style="font-size:14px; margin-bottom:10px;">📊 Visualisasi Proporsi: Pokok vs Bunga</h4>
-      ${buildGrafikAnuitasSVG(M0, totalBunga)}
+    <div style="margin-top:30px;">
+      <h4 style="font-size:14px; margin-bottom:15px; text-align:center;">📊 Grafik Real-Time: Proporsi Pokok vs Bunga</h4>
+      ${buildGrafikBatangAnuitas(M0, totalBunga)}
     </div>
   `;
 }
 
-function buildGrafikAnuitasSVG(pokok, bunga) {
-  const width = 400;
-  const height = 60;
+/* ============================================================
+   FUNGSI GRAFIK BATANG SVG
+   ============================================================ */
+function buildGrafikBatangAnuitas(pokok, bunga) {
   const total = pokok + bunga;
-  
   const pctPokok = (pokok / total) * 100;
   const pctBunga = (bunga / total) * 100;
+
+  // Dimensi SVG
+  const width = 400;
+  const height = 200;
+  const barWidth = 80;
+  const maxBarHeight = 150;
   
-  const wPokok = (pctPokok / 100) * width;
-  const wBunga = (pctBunga / 100) * width;
+  // Skala tinggi
+  const hPokok = (pokok / total) * maxBarHeight;
+  const hBunga = (bunga / total) * maxBarHeight;
 
   return `
-    <svg viewBox="0 0 ${width} ${height}" style="width:100%; height:auto; border-radius:8px; overflow:hidden; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-      <!-- Batang Pokok (Biru) -->
-      <rect x="0" y="0" width="${wPokok}" height="${height}" fill="#3b82f6" />
-      <!-- Batang Bunga (Merah) -->
-      <rect x="${wPokok}" y="0" width="${wBunga}" height="${height}" fill="#ef4444" />
+    <div style="background:var(--gray-bg); padding:20px; border-radius:12px; border:1px solid var(--gray-border);">
+      <svg viewBox="0 0 ${width} ${height}" style="width:100%; height:auto; display:block; margin:0 auto;">
+        
+        <!-- Batang Pokok -->
+        <rect x="${(width/2) - barWidth - 10}" y="${height - 30 - hPokok}" width="${barWidth}" height="${hPokok}" fill="#3b82f6" rx="4" />
+        <!-- Teks Pokok -->
+        <text x="${(width/2) - (barWidth/2) - 10}" y="${height - 35 - hPokok}" text-anchor="middle" font-size="12" font-weight="bold" fill="#1d4ed8">
+          ${Math.round(pctPokok)}%
+        </text>
+        <text x="${(width/2) - (barWidth/2) - 10}" y="${height - 10}" text-anchor="middle" font-size="13" font-weight="bold" fill="#334155">
+          Pokok
+        </text>
+
+        <!-- Batang Bunga -->
+        <rect x="${(width/2) + 10}" y="${height - 30 - hBunga}" width="${barWidth}" height="${hBunga}" fill="#ef4444" rx="4" />
+        <!-- Teks Bunga -->
+        <text x="${(width/2) + (barWidth/2) + 10}" y="${height - 35 - hBunga}" text-anchor="middle" font-size="12" font-weight="bold" fill="#b91c1c">
+          ${Math.round(pctBunga)}%
+        </text>
+        <text x="${(width/2) + (barWidth/2) + 10}" y="${height - 10}" text-anchor="middle" font-size="13" font-weight="bold" fill="#334155">
+          Bunga
+        </text>
+
+        <!-- Garis Dasar -->
+        <line x1="50" y1="${height - 30}" x2="${width - 50}" y2="${height - 30}" stroke="#cbd5e1" stroke-width="2" />
+      </svg>
       
-      <!-- Teks Pokok -->
-      <text x="${wPokok/2}" y="${height/2 + 5}" text-anchor="middle" fill="white" font-size="12" font-weight="bold">
-        ${Math.round(pctPokok)}%
-      </text>
-      
-      <!-- Teks Bunga (hanya muncul jika cukup lebar) -->
-      ${pctBunga > 15 ? `
-      <text x="${wPokok + wBunga/2}" y="${height/2 + 5}" text-anchor="middle" fill="white" font-size="12" font-weight="bold">
-        ${Math.round(pctBunga)}%
-      </text>
-      ` : ''}
-    </svg>
-    <div style="display:flex; justify-content:space-between; margin-top:6px; font-size:12px; color:var(--gray-text);">
-      <span>🟦 Pokok Pinjaman</span>
-      <span>🟥 Bunga</span>
+      <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:12px; color:var(--gray-text); border-top:1px solid var(--gray-border); padding-top:10px;">
+        <span>🟦 Pokok: <strong>${formatRupiahEngine(pokok)}</strong></span>
+        <span>🟥 Bunga: <strong>${formatRupiahEngine(bunga)}</strong></span>
+      </div>
     </div>
   `;
 }

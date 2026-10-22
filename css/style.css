@@ -1370,3 +1370,80 @@ html[data-theme="dark"] .auth-tab.active {
 .login-form label {
   font-size: 13px;
 }
+
+/* ============================================================
+   CUSTOM SLIDER (Garis Kiri-Kanan)
+   ============================================================ */
+
+.custom-slider {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 8px; /* Ketebalan garis */
+  background: var(--gray-border);
+  border-radius: 5px;
+  outline: none;
+  opacity: 0.9;
+  transition: opacity .2s;
+  margin-top: 10px;
+}
+
+.custom-slider:hover {
+  opacity: 1;
+}
+
+/* Bagian Garis yang sudah terlewati (warna biru) - Hanya support di Chrome/Safari */
+.custom-slider::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 5px;
+  background: linear-gradient(to right, var(--blue) 0%, var(--blue) 50%, var(--gray-border) 50%, var(--gray-border) 100%);
+}
+
+/* Tombol Bulat (Thumb) */
+.custom-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  background: var(--white);
+  border: 4px solid var(--blue);
+  border-radius: 50%;
+  cursor: pointer;
+  margin-top: -8px; /* Supaya pas di tengah garis */
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  transition: transform 0.1s;
+}
+
+.custom-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+/* Support Firefox */
+.custom-slider::-moz-range-track {
+  height: 8px;
+  border-radius: 5px;
+  background: var(--gray-border);
+}
+
+.custom-slider::-moz-range-progress {
+  height: 8px;
+  border-radius: 5px;
+  background: var(--blue);
+}
+
+.custom-slider::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  background: var(--white);
+  border: 4px solid var(--blue);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+/* Dark Mode Slider */
+html[data-theme="dark"] .custom-slider {
+  background: #334155;
+}
+html[data-theme="dark"] .custom-slider::-webkit-slider-thumb {
+  background: #1e293b;
+}
